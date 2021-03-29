@@ -1,21 +1,36 @@
+use cw20::TokenInfoResponse;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Storage};
+use cosmwasm_std::{ReadonlyStorage, Storage, Uint128};
 use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
 
-pub static CONFIG_KEY: &[u8] = b"config";
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct State {
-    pub count: i32,
-    pub owner: CanonicalAddr,
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct TokenInfo {
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
+    pub total_supply: Uint128,
 }
 
-pub fn config<S: Storage>(storage: &mut S) -> Singleton<S, State> {
-    singleton(storage, CONFIG_KEY)
+impl Into<TokenInfoResponse> for TokenInfo {
+    fn into(self) -> TokenInfoResponse {
+        TokenInfoResponse {
+            name: self.name,
+            symbol: self.symbol,
+            decimals: self.decimals,
+            total_supply: self.total_supply,
+        }
+    }
 }
 
-pub fn config_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, State> {
-    singleton_read(storage, CONFIG_KEY)
+pub static TOKEN_INFO_KEY: &[u8] = b"token_info";
+
+pub fn token_info<S: Storage>(storage: &mut S) -> Singleton<S, TokenInfo> {
+    singleton(storage, TOKEN_INFO_KEY)
+}
+
+pub fn token_info_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, TokenInfo> {
+    singleton_read(storage, TOKEN_INFO_KEY)
 }
