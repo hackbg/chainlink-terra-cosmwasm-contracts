@@ -116,7 +116,6 @@ Note that this is the same (deterministic) code you will be uploading to
 a blockchain to test it out, as we need to shrink the size and produce a
 clear mapping from wasm hash back to the source code.
 
-
 ## Contributing
 
 For commit message naming convention we use [conventional commits](https://www.conventionalcommits.org/). While this is not enforced, please try to stick to this as it eases the reviewers and also allows us to build automated `changelog` directly out of the commit messages if compliant to the format.
@@ -132,5 +131,5 @@ We use the [gitflow](https://danielkummer.github.io/git-flow-cheatsheet/) workfl
 
 ### Rules
 - Use `rebase` instead of `merge` to update your codebase, except when a PR gets included in a branch.
-- Use meaningfull descriptions and titles in commit messages.
-- Explain what you did in your PRs, add images whenever possible for showing the status before/after the change visually.
+- Use meaningful descriptions and titles in commit messages.
+- Explain what you did in your PRs, add images whenever possible for showing the status before/after the change visually. 
