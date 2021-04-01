@@ -1,7 +1,8 @@
 use cosmwasm_std::{
     to_binary, Api, Binary, Env, Extern, HandleResponse, InitResponse, Querier, StdResult, Storage,
+    Uint128,
 };
-use cw20::TokenInfoResponse;
+use cw20::{Cw20CoinHuman, TokenInfoResponse};
 use cw20_base::{
     allowances::{
         handle_decrease_allowance, handle_increase_allowance, handle_transfer_from, query_allowance,
@@ -14,21 +15,27 @@ use crate::{
     state::{token_info, token_info_read, TokenInfo},
 };
 
+pub const TOKEN_NAME: &str = "Chainlink";
+pub const TOKEN_SYMBOL: &str = "LINK";
+pub const DECIMALS: u8 = 18;
+pub const TOTAL_SUPPLY: u128 = 1_000_000_000;
+
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    _env: Env,
-    msg: InitMsg,
+    env: Env,
+    _msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    // check valid token info
-    msg.validate()?;
-    // create initial accounts
-    let total_supply = create_accounts(deps, &msg.initial_balances)?;
+    let main_balance = Cw20CoinHuman {
+        address: env.message.sender,
+        amount: Uint128::from(TOTAL_SUPPLY),
+    };
+    let total_supply = create_accounts(deps, &vec![main_balance])?;
 
     // store token info
     let data = TokenInfo {
-        name: msg.name,
-        symbol: msg.symbol,
-        decimals: msg.decimals,
+        name: TOKEN_NAME.to_string(),
+        symbol: TOKEN_SYMBOL.to_string(),
+        decimals: DECIMALS,
         total_supply,
     };
     token_info(&mut deps.storage).save(&data)?;
@@ -91,36 +98,23 @@ mod tests {
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
     use cosmwasm_std::{coins, HumanAddr, Uint128};
-    use cw20::Cw20CoinHuman;
 
     #[test]
     fn test_query_token_info() {
         let mut deps = mock_dependencies(10, &coins(2, "test_token"));
-        let address = HumanAddr::from("address1");
-        let amount = Uint128::from(1_000_000_u128);
-
-        let init_msg = InitMsg {
-            name: "Test token".to_string(),
-            symbol: "TEST".to_string(),
-            decimals: 15,
-            initial_balances: vec![Cw20CoinHuman {
-                address: address,
-                amount,
-            }],
-        };
 
         let env = mock_env(&HumanAddr("creator".to_string()), &[]);
-        let _ = init(&mut deps, env, init_msg).unwrap();
+        let _ = init(&mut deps, env, InitMsg {}).unwrap();
 
         let query_res = query_token_info(&deps).unwrap();
 
         assert_eq!(
             query_res,
             TokenInfoResponse {
-                name: "Test token".to_string(),
-                symbol: "TEST".to_string(),
-                decimals: 15,
-                total_supply: Uint128::from(1_000_000_u128)
+                name: "Chainlink".to_string(),
+                symbol: "LINK".to_string(),
+                decimals: 18,
+                total_supply: Uint128::from(1_000_000_000_u128)
             }
         );
     }
