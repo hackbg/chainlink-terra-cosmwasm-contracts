@@ -14,13 +14,13 @@ pub struct TokenInfo {
     pub total_supply: Uint128,
 }
 
-impl Into<TokenInfoResponse> for TokenInfo {
-    fn into(self) -> TokenInfoResponse {
-        TokenInfoResponse {
-            name: self.name,
-            symbol: self.symbol,
-            decimals: self.decimals,
-            total_supply: self.total_supply,
+impl From<TokenInfo> for TokenInfoResponse {
+    fn from(info: TokenInfo) -> Self {
+        Self {
+            name: info.name,
+            symbol: info.symbol,
+            decimals: info.decimals,
+            total_supply: info.total_supply,
         }
     }
 }
