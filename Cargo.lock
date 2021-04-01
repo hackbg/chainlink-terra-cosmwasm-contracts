@@ -392,6 +392,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
+ "cw20",
  "schemars",
  "serde",
  "snafu",
