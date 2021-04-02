@@ -113,30 +113,36 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     match msg {
         HandleMsg::Submit {
-            round_id,
-            submission,
+            round_id: _,
+            submission: _,
         } => todo!(),
         HandleMsg::ChangeOracles {
-            removed,
-            added,
-            added_admins,
-            min_submissions,
-            max_submissions,
-            restart_delay,
+            removed: _,
+            added: _,
+            added_admins: _,
+            min_submissions: _,
+            max_submissions: _,
+            restart_delay: _,
         } => todo!(),
         HandleMsg::WithdrawPayment {
-            oracle,
-            recipient,
-            amount,
+            oracle: _,
+            recipient: _,
+            amount: _,
         } => todo!(),
-        HandleMsg::WithdrawFunds { recipient, amount } => todo!(),
-        HandleMsg::TransferAdmin { oracle, new_admin } => todo!(),
-        HandleMsg::AcceptAdmin { oracle } => todo!(),
+        HandleMsg::WithdrawFunds {
+            recipient: _,
+            amount: _,
+        } => todo!(),
+        HandleMsg::TransferAdmin {
+            oracle: _,
+            new_admin: _,
+        } => todo!(),
+        HandleMsg::AcceptAdmin { oracle: _ } => todo!(),
         HandleMsg::RequestNewRound {} => todo!(),
         HandleMsg::SetRequesterPermissions {
-            requester,
-            authorized,
-            delay,
+            requester: _,
+            authorized: _,
+            delay: _,
         } => todo!(),
         HandleMsg::UpdateFutureRounds {
             payment_amount,
@@ -154,7 +160,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             timeout,
         ),
         HandleMsg::UpdateAvailableFunds {} => todo!(),
-        HandleMsg::SetValidator { validator } => todo!(),
+        HandleMsg::SetValidator { validator: _ } => todo!(),
         HandleMsg::Receive(_) => todo!(),
     }
 }
@@ -201,15 +207,15 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     match msg {
         QueryMsg::GetAllocatedFunds {} => to_binary(&get_allocated_funds(deps)),
         QueryMsg::GetAvailableFunds {} => to_binary(&get_available_funds(deps)),
-        QueryMsg::GetWithdrawablePayment { oracle } => todo!(),
+        QueryMsg::GetWithdrawablePayment { oracle: _ } => todo!(),
         QueryMsg::GetOracleCount {} => to_binary(&get_oracle_count(deps)),
         QueryMsg::GetOracles {} => to_binary(&get_oracles(deps)),
-        QueryMsg::GetAdmin { oracle } => todo!(),
-        QueryMsg::GetRoundData { round_id } => todo!(),
+        QueryMsg::GetAdmin { oracle: _ } => todo!(),
+        QueryMsg::GetRoundData { round_id: _ } => todo!(),
         QueryMsg::GetLatestRoundData {} => todo!(),
         QueryMsg::GetOracleRoundState {
-            oracle,
-            queried_round_id,
+            oracle: _,
+            queried_round_id: _,
         } => todo!(),
     }
 }
