@@ -9,8 +9,8 @@ pub struct InitMsg {
     pub payment_amount: Uint128,
     pub timeout: u32,
     pub validator: HumanAddr,
-    pub min_submission_value: i128, // TODO: Might have to bump to BigInt
-    pub max_submission_value: i128,
+    pub min_submission_value: String, // BigInt
+    pub max_submission_value: String, // BigInt
     pub decimals: u8,
     pub description: String,
 }
@@ -54,8 +54,8 @@ pub enum HandleMsg {
     },
     UpdateFutureRounds {
         payment_amount: Uint128,
-        min_submission: u32,
-        max_submission: u32,
+        min_submissions: u32,
+        max_submissions: u32,
         restart_delay: u32,
         timeout: u32,
     },
@@ -92,9 +92,9 @@ pub enum QueryMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct RoundDataResponse {
     pub round_id: Uint128,          // uint80
-    pub answer: i128,               // int256
-    pub started_at: Uint128,        // int256
-    pub updated_at: Uint128,        // uint256
+    pub answer: i128,               // BigInt
+    pub started_at: Uint128,        // BigInt
+    pub updated_at: Uint128,        // BigUInt
     pub answered_in_round: Uint128, // uint80
 }
 
@@ -102,7 +102,7 @@ pub struct RoundDataResponse {
 pub struct OracleRoundStateResponse {
     pub elegible_to_submit: bool, // bool
     pub round_id: u32,            // uint32
-    pub latest_submission: i128,  // int256
+    pub latest_submission: i128,  // BigInt
     pub started_at: u64,          // uint64
     pub timeout: u64,             // uint64
     pub available_funds: Uint128, // uint128
