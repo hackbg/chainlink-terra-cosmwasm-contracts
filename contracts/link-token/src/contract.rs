@@ -29,7 +29,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         address: env.message.sender,
         amount: Uint128::from(TOTAL_SUPPLY),
     };
-    let total_supply = create_accounts(deps, &vec![main_balance])?;
+    let total_supply = create_accounts(deps, &[main_balance])?;
 
     // store token info
     let data = TokenInfo {
