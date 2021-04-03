@@ -8,15 +8,22 @@ use cosmwasm_storage::{
     Singleton,
 };
 
+pub static OWNER_KEY: &[u8] = b"owner";
 pub static CONFIG_KEY: &[u8] = b"config";
 pub static ORACLE_ADDRESSES_KEY: &[u8] = b"oracle_addr";
 pub static RECORDED_FUNDS_KEY: &[u8] = b"recorded_funds";
 pub static PREFIX_ROUND: &[u8] = b"round";
 
+pub fn owner<S: Storage>(storage: &mut S) -> Singleton<S, CanonicalAddr> {
+    singleton(storage, OWNER_KEY)
+}
+
+pub fn owner_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, CanonicalAddr> {
+    singleton_read(storage, OWNER_KEY)
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
-    pub owner: Immutable<CanonicalAddr>,
-
     pub link: CanonicalAddr,
     pub validator: CanonicalAddr,
 
@@ -35,7 +42,6 @@ pub struct State {
 impl State {
     #[allow(clippy::clippy::too_many_arguments)]
     pub fn new(
-        owner: CanonicalAddr,
         link: CanonicalAddr,
         validator: CanonicalAddr,
         payment_amount: Uint128,
@@ -49,7 +55,6 @@ impl State {
         max_submission_value: Uint128, // int256
     ) -> Self {
         Self {
-            owner: Immutable::new(owner),
             link,
             validator,
             payment_amount,

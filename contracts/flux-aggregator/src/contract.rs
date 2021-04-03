@@ -6,7 +6,7 @@ use cosmwasm_std::{
 use crate::{
     msg::{HandleMsg, InitMsg, QueryMsg},
     state::{
-        config, config_read, oracle_addresses_read, recorded_funds_read, rounds, Round, State,
+        config, oracle_addresses_read, owner, owner_read, recorded_funds_read, rounds, Round, State,
     },
 };
 
@@ -22,9 +22,10 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     let validator = deps.api.canonical_address(&msg.validator)?;
     let logs = update_future_rounds(deps, msg.payment_amount, 0, 0, 0, msg.timeout)?;
 
+    owner(&mut deps.storage).save(&sender)?;
+
     config(&mut deps.storage).update(|state| {
         Ok(State::new(
-            sender,
             link,
             validator,
             state.payment_amount,
@@ -194,8 +195,8 @@ pub fn handle_update_future_rounds<S: Storage, A: Api, Q: Querier>(
     timeout: u32,
 ) -> StdResult<HandleResponse> {
     let sender = deps.api.canonical_address(&env.message.sender)?;
-    let owner = config_read(&deps.storage).load()?.owner;
-    if sender != *owner {
+    let owner = owner_read(&deps.storage).load()?;
+    if sender != owner {
         return Err(StdError::generic_err("Only callable by owner"));
     }
 
