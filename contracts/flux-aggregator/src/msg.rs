@@ -9,8 +9,8 @@ pub struct InitMsg {
     pub payment_amount: Uint128,
     pub timeout: u32,
     pub validator: HumanAddr,
-    pub min_submission_value: String, // BigInt
-    pub max_submission_value: String, // BigInt
+    pub min_submission_value: Uint128, // int256
+    pub max_submission_value: Uint128, // int256
     pub decimals: u8,
     pub description: String,
 }
@@ -19,8 +19,8 @@ pub struct InitMsg {
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
     Submit {
-        round_id: Uint128,
-        submission: i128,
+        round_id: Uint128,   // uint128
+        submission: Uint128, // int128
     },
     ChangeOracles {
         removed: Vec<HumanAddr>,
@@ -33,11 +33,11 @@ pub enum HandleMsg {
     WithdrawPayment {
         oracle: HumanAddr,
         recipient: HumanAddr,
-        amount: Uint128,
+        amount: Uint128, // uint256
     },
     WithdrawFunds {
         recipient: HumanAddr,
-        amount: Uint128,
+        amount: Uint128, // uint256
     },
     TransferAdmin {
         oracle: HumanAddr,
@@ -92,20 +92,20 @@ pub enum QueryMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct RoundDataResponse {
     pub round_id: Uint128,          // uint80
-    pub answer: i128,               // BigInt
-    pub started_at: Uint128,        // BigInt
-    pub updated_at: Uint128,        // BigUInt
+    pub answer: Uint128,            // int256
+    pub started_at: Uint128,        // int256
+    pub updated_at: Uint128,        // uint256
     pub answered_in_round: Uint128, // uint80
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct OracleRoundStateResponse {
-    pub elegible_to_submit: bool, // bool
-    pub round_id: u32,            // uint32
-    pub latest_submission: i128,  // BigInt
-    pub started_at: u64,          // uint64
-    pub timeout: u64,             // uint64
-    pub available_funds: Uint128, // uint128
-    pub oracle_count: u8,         // uint8
-    pub payment_amount: Uint128,  // uint128
+    pub elegible_to_submit: bool,   // bool
+    pub round_id: u32,              // uint32
+    pub latest_submission: Uint128, // int256
+    pub started_at: u64,            // uint64
+    pub timeout: u64,               // uint64
+    pub available_funds: Uint128,   // uint128
+    pub oracle_count: u8,           // uint8
+    pub payment_amount: Uint128,    // uint128
 }

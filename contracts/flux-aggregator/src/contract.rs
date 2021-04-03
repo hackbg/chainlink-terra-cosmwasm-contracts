@@ -34,8 +34,8 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
             state.timeout,
             msg.decimals,
             msg.description.clone(),
-            msg.min_submission_value.clone(),
-            msg.max_submission_value.clone(),
+            msg.min_submission_value,
+            msg.max_submission_value,
         ))
     })?;
 
@@ -113,9 +113,9 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     match msg {
         HandleMsg::Submit {
-            round_id: _,
-            submission: _,
-        } => todo!(),
+            round_id,
+            submission,
+        } => handle_submit(deps, env, round_id, submission),
         HandleMsg::ChangeOracles {
             removed: _,
             added: _,
@@ -125,10 +125,10 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             restart_delay: _,
         } => todo!(),
         HandleMsg::WithdrawPayment {
-            oracle: _,
-            recipient: _,
-            amount: _,
-        } => todo!(),
+            oracle,
+            recipient,
+            amount,
+        } => handle_withdraw_payment(deps, env, oracle, recipient, amount),
         HandleMsg::WithdrawFunds {
             recipient: _,
             amount: _,
@@ -163,6 +163,25 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         HandleMsg::SetValidator { validator: _ } => todo!(),
         HandleMsg::Receive(_) => todo!(),
     }
+}
+
+pub fn handle_submit<S: Storage, A: Api, Q: Querier>(
+    _deps: &mut Extern<S, A, Q>,
+    _env: Env,
+    _round_id: Uint128,
+    _submission: Uint128,
+) -> StdResult<HandleResponse> {
+    todo!()
+}
+
+pub fn handle_withdraw_payment<S: Storage, A: Api, Q: Querier>(
+    _deps: &mut Extern<S, A, Q>,
+    _env: Env,
+    _oracle: HumanAddr,
+    _recipient: HumanAddr,
+    _amount: Uint128,
+) -> StdResult<HandleResponse> {
+    todo!()
 }
 
 pub fn handle_update_future_rounds<S: Storage, A: Api, Q: Querier>(

@@ -10,8 +10,11 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [features]
+default = ["singlepass"]
+# for quicker tests, cargo test --lib
 # for more explicit tests, cargo test --features=backtraces
-backtraces = ["cosmwasm-std/backtraces"]
+backtraces = ["cosmwasm-std/backtraces", "cosmwasm-vm/backtraces"]
+singlepass = ["cosmwasm-vm/default-singlepass"]
 
 [dependencies]
 cosmwasm-std = { version = "0.10.1" }
@@ -19,9 +22,8 @@ cosmwasm-storage = { version = "0.10.1" }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 snafu = { version = "0.6.3" }
-num-bigint = { version = "0.4", features = ["serde"] }
 cw20 = { version = "0.2.3" }
-link-token = { path = "../link-token"}
+link-token = { path = "../link-token", default-features = false}
 chainlink-contract-utils = { path = "../chainlink-contract-utils"}
 
 [dev-dependencies]

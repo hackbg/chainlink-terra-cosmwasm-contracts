@@ -28,8 +28,8 @@ pub struct State {
     pub decimals: u8,
     pub description: String,
 
-    min_submission_value: Immutable<String>,
-    max_submission_value: Immutable<String>,
+    min_submission_value: Immutable<Uint128>,
+    max_submission_value: Immutable<Uint128>,
 }
 
 impl State {
@@ -45,8 +45,8 @@ impl State {
         timeout: u32,
         decimals: u8,
         description: String,
-        min_submission_value: String,
-        max_submission_value: String,
+        min_submission_value: Uint128, // int256
+        max_submission_value: Uint128, // int256
     ) -> Self {
         Self {
             owner: Immutable::new(owner),
@@ -83,7 +83,7 @@ pub fn oracle_addresses_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, Ve
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Round {
-    pub answer: Option<i128>, // int256,
+    pub answer: Option<Uint128>, // int256,
     pub started_at: Option<u64>,
     pub updated_at: Option<u64>,
     pub answered_in_round: u64,

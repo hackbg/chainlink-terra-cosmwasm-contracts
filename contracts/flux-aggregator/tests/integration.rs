@@ -17,8 +17,8 @@ fn test_init() {
         payment_amount: Uint128(128),
         timeout: 1800,
         validator: validator_addr,
-        min_submission_value: 1.to_string(),
-        max_submission_value: 10000000.to_string(),
+        min_submission_value: Uint128(1),
+        max_submission_value: Uint128(10000000),
         decimals: 18,
         description: "LINK/USD".to_string(),
     };
