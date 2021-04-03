@@ -194,11 +194,7 @@ pub fn handle_update_future_rounds<S: Storage, A: Api, Q: Querier>(
     restart_delay: u32,
     timeout: u32,
 ) -> StdResult<HandleResponse> {
-    let sender = deps.api.canonical_address(&env.message.sender)?;
-    let owner = owner_read(&deps.storage).load()?;
-    if sender != owner {
-        return Err(StdError::generic_err("Only callable by owner"));
-    }
+    validate_ownership(deps, env)?;
 
     let logs = update_future_rounds(
         deps,
@@ -265,4 +261,16 @@ pub fn get_oracles<S: Storage, A: Api, Q: Querier>(
         .map(|addr| deps.api.human_address(addr))
         .collect::<StdResult<Vec<HumanAddr>>>()?;
     Ok(human_addresses)
+}
+
+fn validate_ownership<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+) -> StdResult<()> {
+    let sender = deps.api.canonical_address(&env.message.sender)?;
+    let owner = owner_read(&deps.storage).load()?;
+    if sender != owner {
+        return Err(StdError::generic_err("Only callable by owner"));
+    }
+    Ok(())
 }
