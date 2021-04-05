@@ -33,7 +33,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: wasm
-          args: --locked
+          args: --all --locked
         env:
           RUSTFLAGS: "-C link-arg=-s"
 
@@ -62,13 +62,13 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- -D warnings
+          args: --all -- -D warnings
 
       # TODO: we should check
       # CHANGES_IN_REPO=$(git status --porcelain)
       # after this, but I don't know how
-      - name: Generate Schema
-        uses: actions-rs/cargo@v1
-        with:
-          command: schema
-          args: --locked
+      # - name: Generate Schema
+      #   uses: actions-rs/cargo@v1
+      #   with:
+      #     command: schema
+      #     args: --locked
