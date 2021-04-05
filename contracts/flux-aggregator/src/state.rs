@@ -14,6 +14,7 @@ pub static PREFIX_ORACLES: &[u8] = b"oracles";
 pub static ORACLE_ADDRESSES_KEY: &[u8] = b"oracle_addr";
 pub static RECORDED_FUNDS_KEY: &[u8] = b"recorded_funds";
 pub static PREFIX_ROUND: &[u8] = b"round";
+pub static LATEST_ROUND_ID_KEY: &[u8] = b"latest_round_id";
 
 pub fn owner<S: Storage>(storage: &mut S) -> Singleton<S, CanonicalAddr> {
     singleton(storage, OWNER_KEY)
@@ -112,7 +113,7 @@ pub struct Round {
     pub answer: Option<Uint128>, // int256,
     pub started_at: Option<u64>,
     pub updated_at: Option<u64>,
-    pub answered_in_round: u64,
+    pub answered_in_round: u32,
 }
 
 pub fn rounds<S: Storage>(storage: &mut S) -> Bucket<S, Round> {
@@ -121,6 +122,14 @@ pub fn rounds<S: Storage>(storage: &mut S) -> Bucket<S, Round> {
 
 pub fn rounds_read<S: Storage>(storage: &S) -> ReadonlyBucket<S, Round> {
     bucket_read(&PREFIX_ROUND, storage)
+}
+
+pub fn latest_round_id<S: Storage>(storage: &mut S) -> Singleton<S, u32> {
+    singleton(storage, LATEST_ROUND_ID_KEY)
+}
+
+pub fn latest_round_id_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, u32> {
+    singleton_read(storage, LATEST_ROUND_ID_KEY)
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

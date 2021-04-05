@@ -5,13 +5,7 @@ use cosmwasm_std::{
 use cw20::BalanceResponse;
 use link_token::msg::{HandleMsg as LinkMsg, QueryMsg as LinkQuery};
 
-use crate::{
-    msg::{HandleMsg, InitMsg, QueryMsg},
-    state::{
-        config, config_read, oracle_addresses, oracle_addresses_read, oracles, oracles_read, owner,
-        owner_read, recorded_funds, recorded_funds_read, rounds, Funds, Round, State,
-    },
-};
+use crate::{msg::*, state::*};
 
 static RESERVE_ROUNDS: u128 = 2;
 
@@ -46,14 +40,15 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     ))?;
 
     rounds(&mut deps.storage).save(
-        &0_u64.to_be_bytes(), // TODO: this should be improved
+        &0_u32.to_be_bytes(), // TODO: this should be improved
         &Round {
             answer: None,
             started_at: None,
             updated_at: None,
-            answered_in_round: env.block.time - msg.timeout as u64,
+            answered_in_round: env.block.time as u32 - msg.timeout,
         },
     )?;
+    latest_round_id(&mut deps.storage).save(&0)?;
 
     Ok(InitResponse::default())
 }
@@ -119,7 +114,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
 pub fn handle_submit<S: Storage, A: Api, Q: Querier>(
     _deps: &mut Extern<S, A, Q>,
     _env: Env,
-    _round_id: Uint128,
+    _round_id: u32,
     _submission: Uint128,
 ) -> StdResult<HandleResponse> {
     todo!()
@@ -309,12 +304,14 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     match msg {
         QueryMsg::GetAllocatedFunds {} => to_binary(&get_allocated_funds(deps)),
         QueryMsg::GetAvailableFunds {} => to_binary(&get_available_funds(deps)),
-        QueryMsg::GetWithdrawablePayment { oracle: _ } => todo!(),
+        QueryMsg::GetWithdrawablePayment { oracle } => {
+            to_binary(&get_withdrawable_payment(deps, oracle))
+        }
         QueryMsg::GetOracleCount {} => to_binary(&get_oracle_count(deps)),
         QueryMsg::GetOracles {} => to_binary(&get_oracles(deps)),
-        QueryMsg::GetAdmin { oracle: _ } => todo!(),
-        QueryMsg::GetRoundData { round_id: _ } => todo!(),
-        QueryMsg::GetLatestRoundData {} => todo!(),
+        QueryMsg::GetAdmin { oracle } => to_binary(&get_admin(deps, oracle)),
+        QueryMsg::GetRoundData { round_id } => to_binary(&get_round_data(deps, round_id)),
+        QueryMsg::GetLatestRoundData {} => to_binary(&get_latest_round_data(deps)),
         QueryMsg::GetOracleRoundState {
             oracle: _,
             queried_round_id: _,
@@ -334,6 +331,15 @@ pub fn get_available_funds<S: Storage, A: Api, Q: Querier>(
     Ok(recorded_funds_read(&deps.storage).load()?.available)
 }
 
+pub fn get_withdrawable_payment<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    oracle: HumanAddr,
+) -> StdResult<Uint128> {
+    let addr = deps.api.canonical_address(&oracle)?;
+    let oracle = oracles_read(&deps.storage).load(addr.as_slice())?;
+    Ok(oracle.withdrawable)
+}
+
 pub fn get_oracle_count<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<u8> {
     Ok(oracle_addresses_read(&deps.storage).load()?.len() as u8)
 }
@@ -347,6 +353,47 @@ pub fn get_oracles<S: Storage, A: Api, Q: Querier>(
         .map(|addr| deps.api.human_address(addr))
         .collect::<StdResult<Vec<HumanAddr>>>()?;
     Ok(human_addresses)
+}
+
+pub fn get_admin<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    oracle: HumanAddr,
+) -> StdResult<HumanAddr> {
+    let addr = deps.api.canonical_address(&oracle)?;
+    let oracle = oracles_read(&deps.storage).load(addr.as_slice())?;
+
+    deps.api.human_address(&oracle.admin)
+}
+
+pub fn get_round_data<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    round_id: u32,
+) -> StdResult<RoundDataResponse> {
+    let round = rounds_read(&deps.storage).load(&round_id.to_be_bytes())?;
+    if round.answered_in_round == 0 {
+        return Err(StdError::generic_err("No data present"));
+    }
+    Ok(RoundDataResponse {
+        round_id,
+        answer: round
+            .answer
+            .ok_or_else(|| StdError::generic_err("'answer' unset"))?,
+        started_at: round
+            .started_at
+            .ok_or_else(|| StdError::generic_err("'started_at' unset"))?,
+        updated_at: round
+            .updated_at
+            .ok_or_else(|| StdError::generic_err("'updated_at' unset"))?,
+        answered_in_round: round.answered_in_round,
+    })
+}
+
+pub fn get_latest_round_data<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<RoundDataResponse> {
+    let round_id = latest_round_id_read(&deps.storage).load()?;
+
+    get_round_data(deps, round_id)
 }
 
 fn validate_ownership<S: Storage, A: Api, Q: Querier>(

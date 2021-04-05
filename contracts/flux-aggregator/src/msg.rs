@@ -19,8 +19,8 @@ pub struct InitMsg {
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
     Submit {
-        round_id: Uint128,   // uint128
-        submission: Uint128, // int128
+        round_id: u32,       // uint256
+        submission: Uint128, // int256
     },
     ChangeOracles {
         removed: Vec<HumanAddr>,
@@ -80,7 +80,7 @@ pub enum QueryMsg {
         oracle: HumanAddr,
     },
     GetRoundData {
-        round_id: Uint128,
+        round_id: u32,
     },
     GetLatestRoundData {},
     GetOracleRoundState {
@@ -91,11 +91,11 @@ pub enum QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct RoundDataResponse {
-    pub round_id: Uint128,          // uint80
-    pub answer: Uint128,            // int256
-    pub started_at: Uint128,        // int256
-    pub updated_at: Uint128,        // uint256
-    pub answered_in_round: Uint128, // uint80
+    pub round_id: u32,          // uint80
+    pub answer: Uint128,        // int256
+    pub started_at: u64,        // int256
+    pub updated_at: u64,        // uint256
+    pub answered_in_round: u32, // uint80
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
