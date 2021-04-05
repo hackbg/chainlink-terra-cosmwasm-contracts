@@ -1,12 +1,15 @@
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse,
-    LogAttribute, Querier, StdError, StdResult, Storage, Uint128,
+    log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
+    QueryRequest, StdError, StdResult, Storage, Uint128, WasmMsg, WasmQuery,
 };
+use cw20::BalanceResponse;
+use link_token::msg::{HandleMsg as LinkMsg, QueryMsg as LinkQuery};
 
 use crate::{
     msg::{HandleMsg, InitMsg, QueryMsg},
     state::{
-        config, oracle_addresses_read, owner, owner_read, recorded_funds_read, rounds, Round, State,
+        config, config_read, oracle_addresses, oracle_addresses_read, oracles, oracles_read, owner,
+        owner_read, recorded_funds, recorded_funds_read, rounds, Funds, Round, State,
     },
 };
 
@@ -17,31 +20,33 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
+    if msg.min_submission_value > msg.max_submission_value {
+        return Err(StdError::generic_err("Min cannot be greater than max"));
+    }
+    oracle_addresses(&mut deps.storage).save(&vec![])?;
+    recorded_funds(&mut deps.storage).save(&Funds::default())?;
+
     let sender = deps.api.canonical_address(&env.message.sender)?;
     let link = deps.api.canonical_address(&msg.link)?;
     let validator = deps.api.canonical_address(&msg.validator)?;
-    let logs = update_future_rounds(deps, msg.payment_amount, 0, 0, 0, msg.timeout)?;
-
     owner(&mut deps.storage).save(&sender)?;
 
-    config(&mut deps.storage).update(|state| {
-        Ok(State::new(
-            link,
-            validator,
-            state.payment_amount,
-            state.max_submission_count,
-            state.min_submission_count,
-            state.restart_delay,
-            state.timeout,
-            msg.decimals,
-            msg.description.clone(),
-            msg.min_submission_value,
-            msg.max_submission_value,
-        ))
-    })?;
+    config(&mut deps.storage).save(&State::new(
+        link,
+        validator,
+        msg.payment_amount,
+        0,
+        0,
+        0,
+        msg.timeout,
+        msg.decimals,
+        msg.description.clone(),
+        msg.min_submission_value,
+        msg.max_submission_value,
+    ))?;
 
     rounds(&mut deps.storage).save(
-        &0_u64.to_be_bytes(),
+        &0_u64.to_be_bytes(), // TODO: this should be improved
         &Round {
             answer: None,
             started_at: None,
@@ -50,61 +55,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         },
     )?;
 
-    Ok(InitResponse {
-        messages: vec![],
-        log: logs,
-    })
-}
-
-fn update_future_rounds<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    payment_amount: Uint128,
-    min_submissions: u32,
-    max_submissions: u32,
-    restart_delay: u32,
-    timeout: u32,
-) -> StdResult<Vec<LogAttribute>> {
-    let oracle_count = oracle_addresses_read(&deps.storage).load()?.len();
-
-    if min_submissions > max_submissions {
-        return Err(StdError::generic_err("Min cannot be greater than max"));
-    }
-
-    if oracle_count < max_submissions as usize {
-        return Err(StdError::generic_err("Max cannot exceed total"));
-    }
-
-    if oracle_count != 0 && oracle_count <= restart_delay as usize {
-        return Err(StdError::generic_err("Delay cannot exceed total"));
-    }
-
-    let funds = recorded_funds_read(&deps.storage).load()?;
-    if funds.available < required_reserve(payment_amount, oracle_count as u128) {
-        return Err(StdError::generic_err("Insufficient funds for payment"));
-    }
-
-    if oracle_count > 0 && min_submissions == 0 {
-        return Err(StdError::generic_err("Min must be greater than 0"));
-    }
-
-    config(&mut deps.storage).update(|mut state| {
-        state.payment_amount = payment_amount;
-        state.min_submission_count = min_submissions;
-        state.max_submission_count = max_submissions;
-        state.restart_delay = restart_delay;
-        state.timeout = timeout;
-
-        Ok(state)
-    })?;
-
-    Ok(vec![
-        log("action", "round_details_updated"),
-        log("payment_amount", payment_amount),
-        log("min_submissions", min_submissions),
-        log("max_submissions", max_submissions),
-        log("restart_delay", restart_delay),
-        log("timeout", timeout),
-    ])
+    Ok(InitResponse::default())
 }
 
 pub fn handle<S: Storage, A: Api, Q: Querier>(
@@ -130,10 +81,9 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             recipient,
             amount,
         } => handle_withdraw_payment(deps, env, oracle, recipient, amount),
-        HandleMsg::WithdrawFunds {
-            recipient: _,
-            amount: _,
-        } => todo!(),
+        HandleMsg::WithdrawFunds { recipient, amount } => {
+            handle_withdraw_funds(deps, env, recipient, amount)
+        }
         HandleMsg::TransferAdmin {
             oracle: _,
             new_admin: _,
@@ -160,7 +110,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             restart_delay,
             timeout,
         ),
-        HandleMsg::UpdateAvailableFunds {} => todo!(),
+        HandleMsg::UpdateAvailableFunds {} => handle_update_available_funds(deps, env),
         HandleMsg::SetValidator { validator: _ } => todo!(),
         HandleMsg::Receive(_) => todo!(),
     }
@@ -176,13 +126,122 @@ pub fn handle_submit<S: Storage, A: Api, Q: Querier>(
 }
 
 pub fn handle_withdraw_payment<S: Storage, A: Api, Q: Querier>(
-    _deps: &mut Extern<S, A, Q>,
-    _env: Env,
-    _oracle: HumanAddr,
-    _recipient: HumanAddr,
-    _amount: Uint128,
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    oracle: HumanAddr,
+    recipient: HumanAddr,
+    amount: Uint128,
 ) -> StdResult<HandleResponse> {
-    todo!()
+    let sender = deps.api.canonical_address(&env.message.sender)?;
+    let oracle = deps.api.canonical_address(&oracle)?;
+    let oracle_status = oracles_read(&deps.storage).load(oracle.as_slice())?;
+
+    if oracle_status.admin != sender {
+        return Err(StdError::generic_err("Only callable by admin"));
+    }
+    if oracle_status.withdrawable < amount {
+        return Err(StdError::generic_err("Insufficient withdrawable funds"));
+    }
+
+    oracles(&mut deps.storage).update(oracle.as_slice(), |status| {
+        let mut status = status.unwrap(); // TODO: might have to add Default
+        let new_withdrawable = (status.withdrawable - amount)?;
+        status.withdrawable = new_withdrawable;
+        Ok(status)
+    })?;
+    recorded_funds(&mut deps.storage).update(|mut funds| {
+        funds.allocated = (funds.allocated - amount)?;
+        Ok(funds)
+    })?;
+
+    let link = config_read(&deps.storage).load()?.link;
+    let link_addr = deps.api.human_address(&link)?;
+
+    let transfer_msg = WasmMsg::Execute {
+        contract_addr: link_addr,
+        msg: to_binary(&LinkMsg::Transfer { recipient, amount })?,
+        send: vec![],
+    };
+
+    Ok(HandleResponse {
+        messages: vec![transfer_msg.into()],
+        log: vec![],
+        data: None,
+    })
+}
+
+pub fn handle_withdraw_funds<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    recipient: HumanAddr,
+    amount: Uint128,
+) -> StdResult<HandleResponse> {
+    validate_ownership(deps, &env)?;
+
+    let funds = recorded_funds_read(&deps.storage).load()?;
+    let payment_amount = config_read(&deps.storage).load()?.payment_amount;
+    let oracle_count = get_oracle_count(&deps)?;
+    let available = (funds.available - required_reserve(payment_amount, oracle_count))?;
+
+    if available < amount {
+        return Err(StdError::generic_err("Insufficient reserve funds"));
+    }
+
+    let link = config_read(&deps.storage).load()?.link;
+    let link_addr = deps.api.human_address(&link)?;
+
+    let transfer_msg = WasmMsg::Execute {
+        contract_addr: link_addr,
+        msg: to_binary(&LinkMsg::Transfer { recipient, amount })?,
+        send: vec![],
+    };
+    let update_funds_msg = WasmMsg::Execute {
+        contract_addr: env.contract.address,
+        msg: to_binary(&HandleMsg::UpdateAvailableFunds {})?,
+        send: vec![],
+    };
+
+    Ok(HandleResponse {
+        messages: vec![transfer_msg.into(), update_funds_msg.into()],
+        log: vec![],
+        data: None,
+    })
+}
+
+pub fn handle_update_available_funds<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+) -> StdResult<HandleResponse> {
+    let link_addr = config_read(&deps.storage).load()?.link;
+    let query = QueryRequest::<()>::Wasm(WasmQuery::Smart {
+        contract_addr: deps.api.human_address(&link_addr)?,
+        msg: to_binary(&LinkQuery::Balance {
+            address: env.contract.address,
+        })?,
+    });
+    let prev_available: BalanceResponse = deps.querier.custom_query(&query)?;
+
+    let funds = recorded_funds_read(&deps.storage).load()?;
+    let now_available = (prev_available.balance - funds.allocated)?;
+
+    // Does this offer us benefits?
+    if funds.available == now_available {
+        return Ok(HandleResponse::default());
+    }
+
+    recorded_funds(&mut deps.storage).update(|mut funds| {
+        funds.available = now_available;
+        Ok(funds)
+    })?;
+
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "update_available_funds"),
+            log("amount", now_available),
+        ],
+        data: None,
+    })
 }
 
 pub fn handle_update_future_rounds<S: Storage, A: Api, Q: Querier>(
@@ -194,26 +253,53 @@ pub fn handle_update_future_rounds<S: Storage, A: Api, Q: Querier>(
     restart_delay: u32,
     timeout: u32,
 ) -> StdResult<HandleResponse> {
-    validate_ownership(deps, env)?;
+    validate_ownership(deps, &env)?;
 
-    let logs = update_future_rounds(
-        deps,
-        payment_amount,
-        min_submissions,
-        max_submissions,
-        restart_delay,
-        timeout,
-    )?;
+    let oracle_count = get_oracle_count(&deps)?;
+
+    if min_submissions > max_submissions {
+        return Err(StdError::generic_err("Min cannot be greater than max"));
+    }
+    if (oracle_count as u32) < max_submissions {
+        return Err(StdError::generic_err("Max cannot exceed total"));
+    }
+    if oracle_count != 0 && (oracle_count as u32) <= restart_delay {
+        return Err(StdError::generic_err("Delay cannot exceed total"));
+    }
+    let funds = recorded_funds_read(&deps.storage).load()?;
+    if funds.available < required_reserve(payment_amount, oracle_count) {
+        return Err(StdError::generic_err("Insufficient funds for payment"));
+    }
+    if oracle_count > 0 && min_submissions == 0 {
+        return Err(StdError::generic_err("Min must be greater than 0"));
+    }
+
+    config(&mut deps.storage).update(|mut state| {
+        state.payment_amount = payment_amount;
+        state.min_submission_count = min_submissions;
+        state.max_submission_count = max_submissions;
+        state.restart_delay = restart_delay;
+        state.timeout = timeout;
+
+        Ok(state)
+    })?;
 
     Ok(HandleResponse {
         messages: vec![],
-        log: logs,
+        log: vec![
+            log("action", "round_details_updated"),
+            log("payment_amount", payment_amount),
+            log("min_submissions", min_submissions),
+            log("max_submissions", max_submissions),
+            log("restart_delay", restart_delay),
+            log("timeout", timeout),
+        ],
         data: None,
     })
 }
 
-fn required_reserve(payment: Uint128, oracle_count: u128) -> Uint128 {
-    Uint128(payment.u128() * oracle_count * RESERVE_ROUNDS)
+fn required_reserve(payment: Uint128, oracle_count: u8) -> Uint128 {
+    Uint128(payment.u128() * oracle_count as u128 * RESERVE_ROUNDS)
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
@@ -264,8 +350,8 @@ pub fn get_oracles<S: Storage, A: Api, Q: Querier>(
 }
 
 fn validate_ownership<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
+    deps: &Extern<S, A, Q>,
+    env: &Env,
 ) -> StdResult<()> {
     let sender = deps.api.canonical_address(&env.message.sender)?;
     let owner = owner_read(&deps.storage).load()?;

@@ -10,6 +10,7 @@ use cosmwasm_storage::{
 
 pub static OWNER_KEY: &[u8] = b"owner";
 pub static CONFIG_KEY: &[u8] = b"config";
+pub static PREFIX_ORACLES: &[u8] = b"oracles";
 pub static ORACLE_ADDRESSES_KEY: &[u8] = b"oracle_addr";
 pub static RECORDED_FUNDS_KEY: &[u8] = b"recorded_funds";
 pub static PREFIX_ROUND: &[u8] = b"round";
@@ -76,6 +77,26 @@ pub fn config<S: Storage>(storage: &mut S) -> Singleton<S, State> {
 
 pub fn config_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, State> {
     singleton_read(storage, CONFIG_KEY)
+}
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct OracleStatus {
+    pub withdrawable: Uint128,
+    pub starting_round: u32,
+    pub ending_round: u32,
+    pub last_reported_round: u32,
+    pub last_started_round: u32,
+    pub latest_submission: Uint128, // int256
+    pub index: u16,
+    pub admin: CanonicalAddr,
+    pub pending_admin: CanonicalAddr,
+}
+
+pub fn oracles<S: Storage>(storage: &mut S) -> Bucket<S, OracleStatus> {
+    bucket(&PREFIX_ORACLES, storage)
+}
+
+pub fn oracles_read<S: Storage>(storage: &S) -> ReadonlyBucket<S, OracleStatus> {
+    bucket_read(&PREFIX_ORACLES, storage)
 }
 
 pub fn oracle_addresses<S: Storage>(storage: &mut S) -> Singleton<S, Vec<CanonicalAddr>> {
