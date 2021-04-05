@@ -89,7 +89,7 @@ pub struct OracleStatus {
     pub latest_submission: Uint128, // int256
     pub index: u16,
     pub admin: CanonicalAddr,
-    pub pending_admin: CanonicalAddr,
+    pub pending_admin: Option<CanonicalAddr>,
 }
 
 pub fn oracles<S: Storage>(storage: &mut S) -> Bucket<S, OracleStatus> {

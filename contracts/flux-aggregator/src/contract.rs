@@ -79,11 +79,10 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         HandleMsg::WithdrawFunds { recipient, amount } => {
             handle_withdraw_funds(deps, env, recipient, amount)
         }
-        HandleMsg::TransferAdmin {
-            oracle: _,
-            new_admin: _,
-        } => todo!(),
-        HandleMsg::AcceptAdmin { oracle: _ } => todo!(),
+        HandleMsg::TransferAdmin { oracle, new_admin } => {
+            handle_transfer_admin(deps, env, oracle, new_admin)
+        }
+        HandleMsg::AcceptAdmin { oracle } => handle_accept_admin(deps, env, oracle),
         HandleMsg::RequestNewRound {} => todo!(),
         HandleMsg::SetRequesterPermissions {
             requester: _,
@@ -118,6 +117,70 @@ pub fn handle_submit<S: Storage, A: Api, Q: Querier>(
     _submission: Uint128,
 ) -> StdResult<HandleResponse> {
     todo!()
+}
+
+pub fn handle_transfer_admin<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    oracle: HumanAddr,
+    new_admin: HumanAddr,
+) -> StdResult<HandleResponse> {
+    let oracle_addr = deps.api.canonical_address(&oracle)?;
+    let sender_addr = deps.api.canonical_address(&env.message.sender)?;
+    let new_admin_addr = deps.api.canonical_address(&new_admin)?;
+
+    oracles(&mut deps.storage).update(oracle_addr.as_slice(), |status| {
+        let mut status = status.unwrap(); // TODO: improve handling
+        if status.admin != sender_addr {
+            return Err(StdError::generic_err("Only callable by admin"));
+        }
+        status.pending_admin = Some(new_admin_addr);
+
+        Ok(status)
+    })?;
+
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("oracle_admin_update_requested", oracle),
+            log("sender", env.message.sender),
+            log("new_admin", new_admin),
+        ],
+        data: None,
+    })
+}
+
+pub fn handle_accept_admin<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    oracle: HumanAddr,
+) -> StdResult<HandleResponse> {
+    let oracle_addr = deps.api.canonical_address(&oracle)?;
+    let sender_addr = deps.api.canonical_address(&env.message.sender)?;
+
+    oracles(&mut deps.storage).update(oracle_addr.as_slice(), |status| {
+        let mut status = status.unwrap(); // TODO: improve handling
+        if let Some(pending_admin) = status.pending_admin {
+            if pending_admin != sender_addr {
+                return Err(StdError::generic_err("Only callable by pending admin"));
+            }
+            status.admin = sender_addr;
+            status.pending_admin = None;
+
+            Ok(status)
+        } else {
+            Err(StdError::generic_err("No pending admin"))
+        }
+    })?;
+
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("oracle_admin_updated", oracle),
+            log("new_admin", env.message.sender),
+        ],
+        data: None,
+    })
 }
 
 pub fn handle_withdraw_payment<S: Storage, A: Api, Q: Querier>(
