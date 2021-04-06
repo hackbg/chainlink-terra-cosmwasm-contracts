@@ -116,7 +116,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             timeout,
         ),
         HandleMsg::UpdateAvailableFunds {} => handle_update_available_funds(deps, env),
-        HandleMsg::SetValidator { validator: _ } => todo!(),
+        HandleMsg::SetValidator { validator } => handle_set_validator(deps, env, validator),
         HandleMsg::Receive(_) => todo!(),
     }
 }
@@ -445,6 +445,35 @@ pub fn handle_update_future_rounds<S: Storage, A: Api, Q: Querier>(
             log("max_submissions", max_submissions),
             log("restart_delay", restart_delay),
             log("timeout", timeout),
+        ],
+        data: None,
+    })
+}
+
+pub fn handle_set_validator<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    validator: HumanAddr,
+) -> StdResult<HandleResponse> {
+    validate_ownership(deps, &env)?;
+
+    let validator_addr = deps.api.canonical_address(&validator)?;
+    let old_validator = config_read(&deps.storage).load()?.validator;
+    if old_validator == validator_addr {
+        return Ok(HandleResponse::default());
+    }
+
+    config(&mut deps.storage).update(|mut state| {
+        state.validator = validator_addr;
+        Ok(state)
+    })?;
+
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "validator_updated"),
+            log("previous", deps.api.human_address(&old_validator)?),
+            log("new", validator),
         ],
         data: None,
     })
