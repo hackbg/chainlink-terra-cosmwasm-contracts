@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
-    QueryRequest, StdError, StdResult, Storage, Uint128, WasmMsg, WasmQuery,
+    log, to_binary, Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr,
+    InitResponse, Querier, QueryRequest, StdError, StdResult, Storage, Uint128, WasmMsg, WasmQuery,
 };
 use cw20::BalanceResponse;
 use link_token::msg::{HandleMsg as LinkMsg, QueryMsg as LinkQuery};
@@ -9,6 +9,7 @@ use crate::{error::*, msg::*, state::*};
 
 static RESERVE_ROUNDS: u128 = 2;
 static MAX_ORACLE_COUNT: u128 = 77;
+static ROUND_MAX: u32 = u32::MAX;
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
@@ -65,13 +66,22 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             submission,
         } => handle_submit(deps, env, round_id, submission),
         HandleMsg::ChangeOracles {
-            removed: _,
-            added: _,
-            added_admins: _,
-            min_submissions: _,
-            max_submissions: _,
-            restart_delay: _,
-        } => todo!(),
+            removed,
+            added,
+            added_admins,
+            min_submissions,
+            max_submissions,
+            restart_delay,
+        } => handle_change_oracles(
+            deps,
+            env,
+            removed,
+            added,
+            added_admins,
+            min_submissions,
+            max_submissions,
+            restart_delay,
+        ),
         HandleMsg::WithdrawPayment {
             oracle,
             recipient,
@@ -133,13 +143,74 @@ pub fn handle_change_oracles<S: Storage, A: Api, Q: Querier>(
     validate_ownership(deps, &env)?;
 
     for oracle in removed {
-        todo!()
+        let oracle = deps.api.canonical_address(&oracle)?;
+        remove_oracle(&mut deps.storage, oracle)?;
     }
+
     if added.len() != added_admins.len() {
         return ContractErr::OracleAdminCountMismatch.std_err();
     }
+    let oracle_count: u128 = get_oracle_count(deps)?.into();
+    let new_count = oracle_count + added.len() as u128;
+    if new_count > MAX_ORACLE_COUNT {
+        return ContractErr::MaxOraclesAllowed.std_err();
+    }
 
-    todo!()
+    for (oracle, admin) in added.iter().zip(added_admins) {
+        let oracle = deps.api.canonical_address(oracle)?;
+        let admin = deps.api.canonical_address(&admin)?;
+        add_oracle(&mut deps.storage, oracle, admin)?;
+    }
+
+    let State {
+        payment_amount,
+        timeout,
+        ..
+    } = config_read(&deps.storage).load()?;
+    let msg = WasmMsg::Execute {
+        contract_addr: env.contract.address,
+        msg: to_binary(&HandleMsg::UpdateFutureRounds {
+            payment_amount,
+            min_submissions,
+            max_submissions,
+            restart_delay,
+            timeout,
+        })?,
+        send: vec![],
+    };
+
+    Ok(HandleResponse {
+        messages: vec![msg.into()],
+        log: vec![],
+        data: None,
+    })
+}
+
+fn remove_oracle<S: Storage>(storage: &mut S, oracle: CanonicalAddr) -> StdResult<()> {
+    // TODO: is this needed?
+    let reporting_round = reporting_round_id_read(storage).load()?;
+    let oracle_status = oracles_read(storage).load(oracle.as_slice())?;
+
+    if oracle_status.ending_round != ROUND_MAX {
+        return ContractErr::OracleNotEnabled.std_err();
+    }
+    oracle_addresses(storage).update(|addresses| {
+        Ok(addresses
+            .into_iter()
+            .filter(|addr| *addr != oracle)
+            .collect())
+    })?;
+    oracles(storage).remove(oracle.as_slice());
+
+    Ok(())
+}
+
+fn add_oracle<S: Storage>(
+    storage: &mut S,
+    oracle: CanonicalAddr,
+    admin: CanonicalAddr,
+) -> StdResult<()> {
+    unimplemented!()
 }
 
 pub fn handle_transfer_admin<S: Storage, A: Api, Q: Querier>(

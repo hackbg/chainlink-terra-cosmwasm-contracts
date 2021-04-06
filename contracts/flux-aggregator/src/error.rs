@@ -30,6 +30,15 @@ pub enum ContractErr {
     /// Need same oracle and admin count
     #[error("Need same oracle and admin count")]
     OracleAdminCountMismatch,
+    /// Cannot add more oracles
+    #[error("Cannot add more oracles")]
+    MaxOraclesAllowed,
+    /// Oracle already enabled
+    #[error("Oracle already enabled")]
+    OracleAlreadyEnabled,
+    /// Oracle not enabled
+    #[error("Oracle not enabled")]
+    OracleNotEnabled,
     /// Insufficient funds for payment
     #[error("Insufficient funds for payment")]
     InsufficientFunds,
@@ -45,7 +54,11 @@ pub enum ContractErr {
 }
 
 impl ContractErr {
+    pub fn std(&self) -> StdError {
+        StdError::generic_err(format!("{}", self))
+    }
+
     pub fn std_err<T>(&self) -> Result<T, StdError> {
-        Err(StdError::generic_err(format!("{}", self)))
+        Err(self.std())
     }
 }

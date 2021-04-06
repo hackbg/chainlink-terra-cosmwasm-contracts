@@ -77,7 +77,7 @@ fn test_withdraw_funds_success() {
 
         let funds_query = QueryMsg::GetAvailableFunds {};
         let res: StdResult<Uint128> = from_binary(&query(&mut deps, funds_query).unwrap()).unwrap();
-        assert_eq!(res.unwrap(), Uint128(20));
+        assert_eq!(res.unwrap(), Uint128(2000));
     }
     {
         assert!(false);
