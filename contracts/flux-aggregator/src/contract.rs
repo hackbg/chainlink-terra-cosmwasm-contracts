@@ -5,9 +5,10 @@ use cosmwasm_std::{
 use cw20::BalanceResponse;
 use link_token::msg::{HandleMsg as LinkMsg, QueryMsg as LinkQuery};
 
-use crate::{msg::*, state::*};
+use crate::{error::*, msg::*, state::*};
 
 static RESERVE_ROUNDS: u128 = 2;
+static MAX_ORACLE_COUNT: u128 = 77;
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
@@ -15,7 +16,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
     if msg.min_submission_value > msg.max_submission_value {
-        return Err(StdError::generic_err("Min cannot be greater than max"));
+        return ContractErr::MinGreaterThanMax.std_err();
     }
     oracle_addresses(&mut deps.storage).save(&vec![])?;
     recorded_funds(&mut deps.storage).save(&Funds::default())?;
@@ -119,6 +120,28 @@ pub fn handle_submit<S: Storage, A: Api, Q: Querier>(
     todo!()
 }
 
+pub fn handle_change_oracles<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    removed: Vec<HumanAddr>,
+    added: Vec<HumanAddr>,
+    added_admins: Vec<HumanAddr>,
+    min_submissions: u32,
+    max_submissions: u32,
+    restart_delay: u32,
+) -> StdResult<HandleResponse> {
+    validate_ownership(deps, &env)?;
+
+    for oracle in removed {
+        todo!()
+    }
+    if added.len() != added_admins.len() {
+        return ContractErr::OracleAdminCountMismatch.std_err();
+    }
+
+    todo!()
+}
+
 pub fn handle_transfer_admin<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
@@ -132,7 +155,7 @@ pub fn handle_transfer_admin<S: Storage, A: Api, Q: Querier>(
     oracles(&mut deps.storage).update(oracle_addr.as_slice(), |status| {
         let mut status = status.unwrap(); // TODO: improve handling
         if status.admin != sender_addr {
-            return Err(StdError::generic_err("Only callable by admin"));
+            return ContractErr::NotAdmin.std_err();
         }
         status.pending_admin = Some(new_admin_addr);
 
@@ -162,14 +185,14 @@ pub fn handle_accept_admin<S: Storage, A: Api, Q: Querier>(
         let mut status = status.unwrap(); // TODO: improve handling
         if let Some(pending_admin) = status.pending_admin {
             if pending_admin != sender_addr {
-                return Err(StdError::generic_err("Only callable by pending admin"));
+                return ContractErr::NotPendingAdmin.std_err();
             }
             status.admin = sender_addr;
             status.pending_admin = None;
 
             Ok(status)
         } else {
-            Err(StdError::generic_err("No pending admin"))
+            ContractErr::PendingAdminMissing.std_err()
         }
     })?;
 
@@ -195,10 +218,10 @@ pub fn handle_withdraw_payment<S: Storage, A: Api, Q: Querier>(
     let oracle_status = oracles_read(&deps.storage).load(oracle.as_slice())?;
 
     if oracle_status.admin != sender {
-        return Err(StdError::generic_err("Only callable by admin"));
+        return ContractErr::NotAdmin.std_err();
     }
     if oracle_status.withdrawable < amount {
-        return Err(StdError::generic_err("Insufficient withdrawable funds"));
+        return ContractErr::InsufficientWithdrawableFunds.std_err();
     }
 
     oracles(&mut deps.storage).update(oracle.as_slice(), |status| {
@@ -242,7 +265,7 @@ pub fn handle_withdraw_funds<S: Storage, A: Api, Q: Querier>(
     let available = (funds.available - required_reserve(payment_amount, oracle_count))?;
 
     if available < amount {
-        return Err(StdError::generic_err("Insufficient reserve funds"));
+        return ContractErr::InsufficientReserveFunds.std_err();
     }
 
     let link = config_read(&deps.storage).load()?.link;
@@ -316,20 +339,20 @@ pub fn handle_update_future_rounds<S: Storage, A: Api, Q: Querier>(
     let oracle_count = get_oracle_count(&deps)?;
 
     if min_submissions > max_submissions {
-        return Err(StdError::generic_err("Min cannot be greater than max"));
+        return ContractErr::MinGreaterThanMax.std_err();
     }
     if (oracle_count as u32) < max_submissions {
-        return Err(StdError::generic_err("Max cannot exceed total"));
+        return ContractErr::MaxGreaterThanTotal.std_err();
     }
     if oracle_count != 0 && (oracle_count as u32) <= restart_delay {
-        return Err(StdError::generic_err("Delay cannot exceed total"));
+        return ContractErr::DelayGreaterThanTotal.std_err();
     }
     let funds = recorded_funds_read(&deps.storage).load()?;
     if funds.available < required_reserve(payment_amount, oracle_count) {
-        return Err(StdError::generic_err("Insufficient funds for payment"));
+        return ContractErr::InsufficientFunds.std_err();
     }
     if oracle_count > 0 && min_submissions == 0 {
-        return Err(StdError::generic_err("Min must be greater than 0"));
+        return ContractErr::MinLessThanZero.std_err();
     }
 
     config(&mut deps.storage).update(|mut state| {
@@ -434,7 +457,7 @@ pub fn get_round_data<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<RoundDataResponse> {
     let round = rounds_read(&deps.storage).load(&round_id.to_be_bytes())?;
     if round.answered_in_round == 0 {
-        return Err(StdError::generic_err("No data present"));
+        return ContractErr::NoData.std_err();
     }
     Ok(RoundDataResponse {
         round_id,
@@ -466,7 +489,7 @@ fn validate_ownership<S: Storage, A: Api, Q: Querier>(
     let sender = deps.api.canonical_address(&env.message.sender)?;
     let owner = owner_read(&deps.storage).load()?;
     if sender != owner {
-        return Err(StdError::generic_err("Only callable by owner"));
+        return ContractErr::NotOwner.std_err();
     }
     Ok(())
 }
