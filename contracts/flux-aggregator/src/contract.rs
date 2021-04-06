@@ -1,24 +1,109 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, Env, Extern, HandleResponse, InitResponse, Querier, StdError,
-    StdResult, Storage,
+    log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse,
+    LogAttribute, Querier, StdError, StdResult, Storage, Uint128,
 };
 
-use crate::msg::{CountResponse, HandleMsg, InitMsg, QueryMsg};
-use crate::state::{config, config_read, State};
+use crate::{
+    msg::{HandleMsg, InitMsg, QueryMsg},
+    state::{
+        config, config_read, oracle_addresses_read, recorded_funds_read, rounds, Round, State,
+    },
+};
+
+static RESERVE_ROUNDS: u128 = 2;
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let state = State {
-        count: msg.count,
-        owner: deps.api.canonical_address(&env.message.sender)?,
-    };
+    let sender = deps.api.canonical_address(&env.message.sender)?;
+    let link = deps.api.canonical_address(&msg.link)?;
+    let validator = deps.api.canonical_address(&msg.validator)?;
+    let logs = update_future_rounds(deps, msg.payment_amount, 0, 0, 0, msg.timeout)?;
 
-    config(&mut deps.storage).save(&state)?;
+    config(&mut deps.storage).update(|state| {
+        Ok(State::new(
+            sender,
+            link,
+            validator,
+            state.payment_amount,
+            state.max_submission_count,
+            state.min_submission_count,
+            state.restart_delay,
+            state.timeout,
+            msg.decimals,
+            msg.description.clone(),
+            msg.min_submission_value.clone(),
+            msg.max_submission_value.clone(),
+        ))
+    })?;
 
-    Ok(InitResponse::default())
+    rounds(&mut deps.storage).save(
+        &0_u64.to_be_bytes(),
+        &Round {
+            answer: None,
+            started_at: None,
+            updated_at: None,
+            answered_in_round: env.block.time - msg.timeout as u64,
+        },
+    )?;
+
+    Ok(InitResponse {
+        messages: vec![],
+        log: logs,
+    })
+}
+
+fn update_future_rounds<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    payment_amount: Uint128,
+    min_submissions: u32,
+    max_submissions: u32,
+    restart_delay: u32,
+    timeout: u32,
+) -> StdResult<Vec<LogAttribute>> {
+    let oracle_count = oracle_addresses_read(&deps.storage).load()?.len();
+
+    if min_submissions > max_submissions {
+        return Err(StdError::generic_err("Min cannot be greater than max"));
+    }
+
+    if oracle_count < max_submissions as usize {
+        return Err(StdError::generic_err("Max cannot exceed total"));
+    }
+
+    if oracle_count != 0 && oracle_count <= restart_delay as usize {
+        return Err(StdError::generic_err("Delay cannot exceed total"));
+    }
+
+    let funds = recorded_funds_read(&deps.storage).load()?;
+    if funds.available < required_reserve(payment_amount, oracle_count as u128) {
+        return Err(StdError::generic_err("Insufficient funds for payment"));
+    }
+
+    if oracle_count > 0 && min_submissions == 0 {
+        return Err(StdError::generic_err("Min must be greater than 0"));
+    }
+
+    config(&mut deps.storage).update(|mut state| {
+        state.payment_amount = payment_amount;
+        state.min_submission_count = min_submissions;
+        state.max_submission_count = max_submissions;
+        state.restart_delay = restart_delay;
+        state.timeout = timeout;
+
+        Ok(state)
+    })?;
+
+    Ok(vec![
+        log("action", "round_details_updated"),
+        log("payment_amount", payment_amount),
+        log("min_submissions", min_submissions),
+        log("max_submissions", max_submissions),
+        log("restart_delay", restart_delay),
+        log("timeout", timeout),
+    ])
 }
 
 pub fn handle<S: Storage, A: Api, Q: Querier>(
@@ -27,37 +112,92 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
-        HandleMsg::Increment {} => try_increment(deps, env),
-        HandleMsg::Reset { count } => try_reset(deps, env, count),
+        HandleMsg::Submit {
+            round_id: _,
+            submission: _,
+        } => todo!(),
+        HandleMsg::ChangeOracles {
+            removed: _,
+            added: _,
+            added_admins: _,
+            min_submissions: _,
+            max_submissions: _,
+            restart_delay: _,
+        } => todo!(),
+        HandleMsg::WithdrawPayment {
+            oracle: _,
+            recipient: _,
+            amount: _,
+        } => todo!(),
+        HandleMsg::WithdrawFunds {
+            recipient: _,
+            amount: _,
+        } => todo!(),
+        HandleMsg::TransferAdmin {
+            oracle: _,
+            new_admin: _,
+        } => todo!(),
+        HandleMsg::AcceptAdmin { oracle: _ } => todo!(),
+        HandleMsg::RequestNewRound {} => todo!(),
+        HandleMsg::SetRequesterPermissions {
+            requester: _,
+            authorized: _,
+            delay: _,
+        } => todo!(),
+        HandleMsg::UpdateFutureRounds {
+            payment_amount,
+            min_submissions,
+            max_submissions,
+            restart_delay,
+            timeout,
+        } => handle_update_future_rounds(
+            deps,
+            env,
+            payment_amount,
+            min_submissions,
+            max_submissions,
+            restart_delay,
+            timeout,
+        ),
+        HandleMsg::UpdateAvailableFunds {} => todo!(),
+        HandleMsg::SetValidator { validator: _ } => todo!(),
+        HandleMsg::Receive(_) => todo!(),
     }
 }
 
-pub fn try_increment<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    _env: Env,
-) -> StdResult<HandleResponse> {
-    config(&mut deps.storage).update(|mut state| {
-        state.count += 1;
-        Ok(state)
-    })?;
-
-    Ok(HandleResponse::default())
-}
-
-pub fn try_reset<S: Storage, A: Api, Q: Querier>(
+pub fn handle_update_future_rounds<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    count: i32,
+    payment_amount: Uint128,
+    min_submissions: u32,
+    max_submissions: u32,
+    restart_delay: u32,
+    timeout: u32,
 ) -> StdResult<HandleResponse> {
-    let api = &deps.api;
-    config(&mut deps.storage).update(|mut state| {
-        if api.canonical_address(&env.message.sender)? != state.owner {
-            return Err(StdError::unauthorized());
-        }
-        state.count = count;
-        Ok(state)
-    })?;
-    Ok(HandleResponse::default())
+    let sender = deps.api.canonical_address(&env.message.sender)?;
+    let owner = config_read(&deps.storage).load()?.owner;
+    if sender != *owner {
+        return Err(StdError::generic_err("Only callable by owner"));
+    }
+
+    let logs = update_future_rounds(
+        deps,
+        payment_amount,
+        min_submissions,
+        max_submissions,
+        restart_delay,
+        timeout,
+    )?;
+
+    Ok(HandleResponse {
+        messages: vec![],
+        log: logs,
+        data: None,
+    })
+}
+
+fn required_reserve(payment: Uint128, oracle_count: u128) -> Uint128 {
+    Uint128(payment.u128() * oracle_count * RESERVE_ROUNDS)
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
@@ -65,82 +205,44 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
+        QueryMsg::GetAllocatedFunds {} => to_binary(&get_allocated_funds(deps)),
+        QueryMsg::GetAvailableFunds {} => to_binary(&get_available_funds(deps)),
+        QueryMsg::GetWithdrawablePayment { oracle: _ } => todo!(),
+        QueryMsg::GetOracleCount {} => to_binary(&get_oracle_count(deps)),
+        QueryMsg::GetOracles {} => to_binary(&get_oracles(deps)),
+        QueryMsg::GetAdmin { oracle: _ } => todo!(),
+        QueryMsg::GetRoundData { round_id: _ } => todo!(),
+        QueryMsg::GetLatestRoundData {} => todo!(),
+        QueryMsg::GetOracleRoundState {
+            oracle: _,
+            queried_round_id: _,
+        } => todo!(),
     }
 }
 
-fn query_count<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<CountResponse> {
-    let state = config_read(&deps.storage).load()?;
-    Ok(CountResponse { count: state.count })
+pub fn get_allocated_funds<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<Uint128> {
+    Ok(recorded_funds_read(&deps.storage).load()?.allocated)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, from_binary, StdError};
+pub fn get_available_funds<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<Uint128> {
+    Ok(recorded_funds_read(&deps.storage).load()?.available)
+}
 
-    #[test]
-    fn proper_initialization() {
-        let mut deps = mock_dependencies(20, &[]);
+pub fn get_oracle_count<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<u8> {
+    Ok(oracle_addresses_read(&deps.storage).load()?.len() as u8)
+}
 
-        let msg = InitMsg { count: 17 };
-        let env = mock_env("creator", &coins(1000, "earth"));
-
-        // we can just call .unwrap() to assert this was a success
-        let res = init(&mut deps, env, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // it worked, let's query the state
-        let res = query(&deps, QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(17, value.count);
-    }
-
-    #[test]
-    fn increment() {
-        let mut deps = mock_dependencies(20, &coins(2, "token"));
-
-        let msg = InitMsg { count: 17 };
-        let env = mock_env("creator", &coins(2, "token"));
-        let _res = init(&mut deps, env, msg).unwrap();
-
-        // beneficiary can release it
-        let env = mock_env("anyone", &coins(2, "token"));
-        let msg = HandleMsg::Increment {};
-        let _res = handle(&mut deps, env, msg).unwrap();
-
-        // should increase counter by 1
-        let res = query(&deps, QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(18, value.count);
-    }
-
-    #[test]
-    fn reset() {
-        let mut deps = mock_dependencies(20, &coins(2, "token"));
-
-        let msg = InitMsg { count: 17 };
-        let env = mock_env("creator", &coins(2, "token"));
-        let _res = init(&mut deps, env, msg).unwrap();
-
-        // beneficiary can release it
-        let unauth_env = mock_env("anyone", &coins(2, "token"));
-        let msg = HandleMsg::Reset { count: 5 };
-        let res = handle(&mut deps, unauth_env, msg);
-        match res {
-            Err(StdError::Unauthorized { .. }) => {}
-            _ => panic!("Must return unauthorized error"),
-        }
-
-        // only the original creator can reset the counter
-        let auth_env = mock_env("creator", &coins(2, "token"));
-        let msg = HandleMsg::Reset { count: 5 };
-        let _res = handle(&mut deps, auth_env, msg).unwrap();
-
-        // should now be 5
-        let res = query(&deps, QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(5, value.count);
-    }
+pub fn get_oracles<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<Vec<HumanAddr>> {
+    let addresses = oracle_addresses_read(&deps.storage).load()?;
+    let human_addresses = addresses
+        .iter()
+        .map(|addr| deps.api.human_address(addr))
+        .collect::<StdResult<Vec<HumanAddr>>>()?;
+    Ok(human_addresses)
 }
