@@ -2,7 +2,7 @@ use cosmwasm_std::{
     log, to_binary, Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr,
     InitResponse, Querier, QueryRequest, StdError, StdResult, Storage, Uint128, WasmMsg, WasmQuery,
 };
-use cw20::BalanceResponse;
+use cw20::{BalanceResponse, Cw20ReceiveMsg};
 use link_token::msg::{HandleMsg as LinkMsg, QueryMsg as LinkQuery};
 
 use crate::{error::*, msg::*, state::*};
@@ -117,7 +117,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         ),
         HandleMsg::UpdateAvailableFunds {} => handle_update_available_funds(deps, env),
         HandleMsg::SetValidator { validator } => handle_set_validator(deps, env, validator),
-        HandleMsg::Receive(_) => todo!(),
+        HandleMsg::Receive(receive_msg) => handle_receive(deps, env, receive_msg),
     }
 }
 
@@ -475,6 +475,27 @@ pub fn handle_set_validator<S: Storage, A: Api, Q: Querier>(
             log("previous", deps.api.human_address(&old_validator)?),
             log("new", validator),
         ],
+        data: None,
+    })
+}
+
+pub fn handle_receive<S: Storage, A: Api, Q: Querier>(
+    _deps: &mut Extern<S, A, Q>,
+    env: Env,
+    receive_msg: Cw20ReceiveMsg,
+) -> StdResult<HandleResponse> {
+    if receive_msg.msg.is_some() {
+        return ContractErr::UnexpectedReceivePayload.std_err();
+    }
+    let msg = WasmMsg::Execute {
+        contract_addr: env.contract.address,
+        msg: to_binary(&HandleMsg::UpdateAvailableFunds {})?,
+        send: vec![],
+    };
+
+    Ok(HandleResponse {
+        messages: vec![msg.into()],
+        log: vec![],
         data: None,
     })
 }

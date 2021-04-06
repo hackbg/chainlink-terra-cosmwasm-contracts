@@ -51,6 +51,9 @@ pub enum ContractErr {
     /// Delay cannot exceed total
     #[error("Delay cannot exceed total")]
     DelayGreaterThanTotal,
+    /// Receive does not expect payload
+    #[error("Receive does not expect payload")]
+    UnexpectedReceivePayload,
 }
 
 impl ContractErr {
