@@ -13,6 +13,7 @@ pub static CONFIG_KEY: &[u8] = b"config";
 pub static PREFIX_ORACLES: &[u8] = b"oracles";
 pub static ORACLE_ADDRESSES_KEY: &[u8] = b"oracle_addr";
 pub static RECORDED_FUNDS_KEY: &[u8] = b"recorded_funds";
+pub static PREFIX_REQUESTERS: &[u8] = b"requesters";
 pub static PREFIX_ROUND: &[u8] = b"round";
 pub static LATEST_ROUND_ID_KEY: &[u8] = b"latest_round_id";
 pub static REPORTING_ROUND_ID_KEY: &[u8] = b"reporting_round_id";
@@ -123,6 +124,21 @@ pub fn rounds<S: Storage>(storage: &mut S) -> Bucket<S, Round> {
 
 pub fn rounds_read<S: Storage>(storage: &S) -> ReadonlyBucket<S, Round> {
     bucket_read(&PREFIX_ROUND, storage)
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct Requester {
+    pub authorized: bool,
+    pub delay: u32,
+    pub last_started_round: u32,
+}
+
+pub fn requesters<S: Storage>(storage: &mut S) -> Bucket<S, Requester> {
+    bucket(&PREFIX_REQUESTERS, storage)
+}
+
+pub fn requesters_read<S: Storage>(storage: &S) -> ReadonlyBucket<S, Requester> {
+    bucket_read(&PREFIX_REQUESTERS, storage)
 }
 
 pub fn reporting_round_id<S: Storage>(storage: &mut S) -> Singleton<S, u32> {

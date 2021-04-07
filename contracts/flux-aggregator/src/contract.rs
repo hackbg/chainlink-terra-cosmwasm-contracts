@@ -96,10 +96,10 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         HandleMsg::AcceptAdmin { oracle } => handle_accept_admin(deps, env, oracle),
         HandleMsg::RequestNewRound {} => todo!(),
         HandleMsg::SetRequesterPermissions {
-            requester: _,
-            authorized: _,
-            delay: _,
-        } => todo!(),
+            requester,
+            authorized,
+            delay,
+        } => handle_set_requester_permissions(deps, env, requester, authorized, delay),
         HandleMsg::UpdateFutureRounds {
             payment_amount,
             min_submissions,
@@ -391,6 +391,46 @@ pub fn handle_update_available_funds<S: Storage, A: Api, Q: Querier>(
         log: vec![
             log("action", "update_available_funds"),
             log("amount", now_available),
+        ],
+        data: None,
+    })
+}
+
+pub fn handle_set_requester_permissions<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    requester: HumanAddr,
+    authorized: bool,
+    delay: u32,
+) -> StdResult<HandleResponse> {
+    validate_ownership(deps, &env)?;
+
+    let requester_addr = deps.api.canonical_address(&requester)?;
+    let curr_requester = requesters_read(&deps.storage).load(requester_addr.as_slice())?;
+
+    if curr_requester.authorized == authorized {
+        return Ok(HandleResponse::default());
+    }
+    if authorized {
+        requesters(&mut deps.storage).update(requester_addr.as_slice(), |requester| {
+            let requester = requester.unwrap(); // TODO: handling
+            Ok(Requester {
+                authorized,
+                delay,
+                last_started_round: requester.last_started_round,
+            })
+        })?;
+    } else {
+        requesters(&mut deps.storage).remove(requester_addr.as_slice());
+    }
+
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "set_requester_permission"),
+            log("requester", requester),
+            log("authorized", authorized),
+            log("delay", delay),
         ],
         data: None,
     })
