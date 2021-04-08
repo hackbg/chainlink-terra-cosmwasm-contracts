@@ -74,7 +74,6 @@ fn test_withdraw_funds_success() {
     let res: HandleResponse = handle(&mut deps, env.clone(), withdraw).unwrap();
     assert!(res.messages.len() == 2);
     let cosmos_msg = res.messages.get(1).unwrap();
-    println!("{:?}", cosmos_msg);
     if let CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: _,
         msg,
