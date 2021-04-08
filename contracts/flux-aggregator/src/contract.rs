@@ -131,6 +131,7 @@ pub fn handle_submit<S: Storage, A: Api, Q: Querier>(
     todo!()
 }
 
+#[allow(clippy::clippy::too_many_arguments)]
 pub fn handle_change_oracles<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
