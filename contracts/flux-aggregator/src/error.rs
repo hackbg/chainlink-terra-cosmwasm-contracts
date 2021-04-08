@@ -21,12 +21,18 @@ pub enum ContractErr {
     /// Only callable by admin
     #[error("Only callable by admin")]
     NotAdmin,
+    /// Owner cannot overwrite admin
+    #[error("Owner cannot overwrite admin")]
+    OverwritingAdmin,
     /// Only callable by pending admin
     #[error("Only callable by pending admin")]
     NotPendingAdmin,
     /// No pending admin
     #[error("No pending admin")]
     PendingAdminMissing,
+    /// Cannot set empty admin address
+    #[error("Cannot set empty admin address")]
+    EmptyAdminAddr,
     /// Need same oracle and admin count
     #[error("Need same oracle and admin count")]
     OracleAdminCountMismatch,

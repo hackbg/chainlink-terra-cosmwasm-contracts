@@ -21,6 +21,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     }
     oracle_addresses(&mut deps.storage).save(&vec![])?;
     recorded_funds(&mut deps.storage).save(&Funds::default())?;
+    reporting_round_id(&mut deps.storage).save(&0)?;
 
     let sender = deps.api.canonical_address(&env.message.sender)?;
     let link = deps.api.canonical_address(&msg.link)?;
@@ -188,7 +189,7 @@ pub fn handle_change_oracles<S: Storage, A: Api, Q: Querier>(
 
 fn remove_oracle<S: Storage>(storage: &mut S, oracle: CanonicalAddr) -> StdResult<()> {
     // TODO: is this needed?
-    let reporting_round = reporting_round_id_read(storage).load()?;
+    // let reporting_round = reporting_round_id_read(storage).load()?;
     let oracle_status = oracles_read(storage).load(oracle.as_slice())?;
 
     if oracle_status.ending_round != ROUND_MAX {
@@ -210,7 +211,44 @@ fn add_oracle<S: Storage>(
     oracle: CanonicalAddr,
     admin: CanonicalAddr,
 ) -> StdResult<()> {
-    unimplemented!()
+    let oracle_status = oracles_read(storage)
+        .load(oracle.as_slice())
+        .unwrap_or_else(|_| OracleStatus::default());
+
+    if oracle_status.ending_round == ROUND_MAX {
+        return ContractErr::OracleNotEnabled.std_err();
+    }
+    if admin.is_empty() {
+        return ContractErr::EmptyAdminAddr.std_err();
+    }
+    if !oracle_status.admin.is_empty() && oracle_status.admin != admin {
+        return ContractErr::OverwritingAdmin.std_err();
+    }
+
+    let current_round = reporting_round_id_read(storage).load()?;
+    let starting_round = if current_round != 0 && current_round == oracle_status.ending_round {
+        current_round
+    } else {
+        current_round + 1
+    };
+    let index = oracle_addresses_read(storage).load()?.len() as u16;
+
+    oracles(storage).update(oracle.as_slice(), |status| {
+        let mut status = status.unwrap_or_default();
+        status.starting_round = starting_round;
+        status.ending_round = ROUND_MAX;
+        status.index = index;
+        status.admin = admin;
+
+        Ok(status)
+    })?;
+    oracle_addresses(storage).update(|mut addreses| {
+        addreses.push(oracle);
+        Ok(addreses)
+    })?;
+
+    // TODO: add logs
+    Ok(())
 }
 
 pub fn handle_transfer_admin<S: Storage, A: Api, Q: Querier>(
@@ -224,7 +262,7 @@ pub fn handle_transfer_admin<S: Storage, A: Api, Q: Querier>(
     let new_admin_addr = deps.api.canonical_address(&new_admin)?;
 
     oracles(&mut deps.storage).update(oracle_addr.as_slice(), |status| {
-        let mut status = status.unwrap(); // TODO: improve handling
+        let mut status = status.unwrap_or_default();
         if status.admin != sender_addr {
             return ContractErr::NotAdmin.std_err();
         }
@@ -253,7 +291,7 @@ pub fn handle_accept_admin<S: Storage, A: Api, Q: Querier>(
     let sender_addr = deps.api.canonical_address(&env.message.sender)?;
 
     oracles(&mut deps.storage).update(oracle_addr.as_slice(), |status| {
-        let mut status = status.unwrap(); // TODO: improve handling
+        let mut status = status.unwrap_or_default();
         if let Some(pending_admin) = status.pending_admin {
             if pending_admin != sender_addr {
                 return ContractErr::NotPendingAdmin.std_err();
@@ -296,7 +334,7 @@ pub fn handle_withdraw_payment<S: Storage, A: Api, Q: Querier>(
     }
 
     oracles(&mut deps.storage).update(oracle.as_slice(), |status| {
-        let mut status = status.unwrap(); // TODO: might have to add Default
+        let mut status = status.unwrap_or_default();
         let new_withdrawable = (status.withdrawable - amount)?;
         status.withdrawable = new_withdrawable;
         Ok(status)

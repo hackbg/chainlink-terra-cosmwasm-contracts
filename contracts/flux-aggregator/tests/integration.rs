@@ -1,9 +1,9 @@
 use cosmwasm_std::{
-    from_binary, from_slice, to_binary, Binary, CosmosMsg, Empty, HandleResponse, HumanAddr,
+    from_binary, from_slice, to_binary, Binary, CosmosMsg, Empty, Env, HandleResponse, HumanAddr,
     InitResponse, QuerierResult, QueryRequest, StdResult, Uint128, WasmMsg, WasmQuery,
 };
 use cosmwasm_vm::{
-    testing::{handle, init, mock_env, mock_instance, query, MockApi, MockStorage},
+    testing::{handle, init, mock_env, mock_instance, query, MockApi, MockQuerier, MockStorage},
     Extern, GasInfo, Instance, Querier,
 };
 use cw20::BalanceResponse;
@@ -12,8 +12,11 @@ use flux_aggregator::msg::{HandleMsg, InitMsg, QueryMsg};
 static WASM: &[u8] =
     include_bytes!("../../../target/wasm32-unknown-unknown/release/flux_aggregator.wasm");
 
-#[test]
-fn test_init() {
+static MIN_ANS: u32 = 1;
+static MAX_ANS: u32 = 1;
+static RESTART_DELAY: u32 = 0;
+
+fn default_init() -> (Instance<MockStorage, MockApi, MockQuerier<Empty>>, Env) {
     let link_addr = HumanAddr::from("link");
 
     let validator_addr = HumanAddr::from("validator");
@@ -31,12 +34,17 @@ fn test_init() {
     let mut deps = mock_instance(WASM, &[]);
     let env = mock_env("aggregator", &[]);
     let _: InitResponse = init(&mut deps, env.clone(), msg).unwrap();
+
+    return (deps, env);
+}
+#[test]
+fn test_init() {
+    let _ = default_init();
 }
 
 #[test]
 fn test_withdraw_funds_success() {
     let link_addr = HumanAddr::from("link");
-
     let validator_addr = HumanAddr::from("validator");
     let msg = InitMsg {
         link: link_addr,
@@ -66,6 +74,7 @@ fn test_withdraw_funds_success() {
     let res: HandleResponse = handle(&mut deps, env.clone(), withdraw).unwrap();
     assert!(res.messages.len() == 2);
     let cosmos_msg = res.messages.get(1).unwrap();
+    println!("{:?}", cosmos_msg);
     if let CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: _,
         msg,
@@ -79,24 +88,52 @@ fn test_withdraw_funds_success() {
         let res: StdResult<Uint128> = from_binary(&query(&mut deps, funds_query).unwrap()).unwrap();
         assert_eq!(res.unwrap(), Uint128(2000));
     }
-    {
-        assert!(false);
-    }
 }
 
-fn mock_dependencies_with_custom_querier() -> Extern<MockStorage, MockApi, MyMockQuerier> {
+fn mock_dependencies_with_custom_querier() -> Extern<MockStorage, MockApi, CustomQuerier> {
     Extern {
         api: MockApi::default(),
         storage: MockStorage::default(),
-        querier: MyMockQuerier { balance: 2000 },
+        querier: CustomQuerier { balance: 2000 },
     }
 }
 
-struct MyMockQuerier {
+fn get_oracle_count(deps: &mut Instance<MockStorage, MockApi, MockQuerier<Empty>>) -> u8 {
+    let count_query = QueryMsg::GetOracleCount {};
+    let res = query(deps, count_query).unwrap();
+    let count: StdResult<u8> = from_binary(&res).unwrap();
+
+    count.unwrap()
+}
+
+#[test]
+fn test_add_oracles() {
+    let (mut deps, env) = default_init();
+
+    let old_count = get_oracle_count(&mut deps);
+    assert_eq!(old_count, 0);
+
+    let oracle_to_add = HumanAddr::from("oracle");
+
+    let msg = HandleMsg::ChangeOracles {
+        removed: vec![],
+        added: vec![oracle_to_add.clone()],
+        added_admins: vec![oracle_to_add],
+        min_submissions: MIN_ANS,
+        max_submissions: MAX_ANS,
+        restart_delay: RESTART_DELAY,
+    };
+    let _: HandleResponse = handle(&mut deps, env.clone(), msg).unwrap();
+
+    let new_count = get_oracle_count(&mut deps);
+    assert_eq!(new_count, 1);
+}
+
+struct CustomQuerier {
     pub balance: u128,
 }
 
-impl Querier for MyMockQuerier {
+impl Querier for CustomQuerier {
     fn query_raw(
         &self,
         request: &[u8],

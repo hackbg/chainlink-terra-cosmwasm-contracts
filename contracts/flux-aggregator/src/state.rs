@@ -81,14 +81,14 @@ pub fn config<S: Storage>(storage: &mut S) -> Singleton<S, State> {
 pub fn config_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, State> {
     singleton_read(storage, CONFIG_KEY)
 }
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 pub struct OracleStatus {
     pub withdrawable: Uint128,
     pub starting_round: u32,
     pub ending_round: u32,
-    pub last_reported_round: u32,
-    pub last_started_round: u32,
-    pub latest_submission: Uint128, // int256
+    pub last_reported_round: Option<u32>,
+    pub last_started_round: Option<u32>,
+    pub latest_submission: Option<Uint128>, // int256
     pub index: u16,
     pub admin: CanonicalAddr,
     pub pending_admin: Option<CanonicalAddr>,
@@ -157,19 +157,10 @@ pub fn latest_round_id_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, u32
     singleton_read(storage, LATEST_ROUND_ID_KEY)
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 pub struct Funds {
     pub available: Uint128,
     pub allocated: Uint128,
-}
-
-impl Default for Funds {
-    fn default() -> Self {
-        Self {
-            available: Uint128::zero(),
-            allocated: Uint128::zero(),
-        }
-    }
 }
 
 pub fn recorded_funds<S: Storage>(storage: &mut S) -> Singleton<S, Funds> {
