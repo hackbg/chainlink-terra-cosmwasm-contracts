@@ -157,15 +157,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chainlink-contract-utils"
-version = "0.1.0"
-dependencies = [
- "schemars",
- "serde",
- "snafu",
-]
-
-[[package]]
 name = "cloudabi"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -398,7 +389,6 @@ dependencies = [
 name = "flux-aggregator"
 version = "0.1.0"
 dependencies = [
- "chainlink-contract-utils",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -409,6 +399,7 @@ dependencies = [
  "serde",
  "snafu",
  "thiserror",
+ "utils",
 ]
 
 [[package]]
@@ -538,6 +529,15 @@ dependencies = [
  "cfg-if 0.1.10",
  "libc",
  "void",
+]
+
+[[package]]
+name = "num-traits"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
+dependencies = [
+ "autocfg",
 ]
 
 [[package]]
@@ -873,6 +873,16 @@ name = "unicode-xid"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7fe0bb3479651439c9112f72b6c505038574c9fbb575ed1bf3b797fa39dd564"
+
+[[package]]
+name = "utils"
+version = "0.1.0"
+dependencies = [
+ "num-traits",
+ "schemars",
+ "serde",
+ "snafu",
+]
 
 [[package]]
 name = "version_check"

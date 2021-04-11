@@ -4,6 +4,7 @@ use cosmwasm_std::{
 };
 use cw20::{BalanceResponse, Cw20ReceiveMsg};
 use link_token::msg::{HandleMsg as LinkMsg, QueryMsg as LinkQuery};
+use utils::median::calculate_median;
 
 use crate::{error::*, msg::*, state::*};
 
@@ -170,11 +171,16 @@ pub fn handle_submit<S: Storage, A: Api, Q: Querier>(
 
     // update round answer
     if (round_details.submissions.len() as u32) >= round_details.min_submissions {
-        //   int256 newAnswer = Median.calculateInplace(details[_roundId].submissions);
-        let new_answer = Uint128::zero(); // TODO: median
+        let mut submissions = round_details
+            .submissions
+            .iter()
+            .map(|submission| submission.u128())
+            .collect::<Vec<u128>>();
+        let new_answer = calculate_median(&mut submissions)
+            .map_err(|_| StdError::generic_err("No submissions"))?;
         rounds(&mut deps.storage).update(round_key, |round| {
             Ok(Round {
-                answer: Some(new_answer),
+                answer: Some(Uint128(new_answer)),
                 started_at: round.unwrap().started_at,
                 updated_at: Some(env.block.time),
                 answered_in_round: round_id,
