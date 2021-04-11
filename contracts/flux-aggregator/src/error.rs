@@ -45,6 +45,9 @@ pub enum ContractErr {
     /// Oracle not enabled
     #[error("Oracle not enabled")]
     OracleNotEnabled,
+    /// Oracle not yet enabled
+    #[error("Oracle not yet enabled")]
+    OracleNotYetEnabled,
     /// Insufficient funds for payment
     #[error("Insufficient funds for payment")]
     InsufficientFunds,

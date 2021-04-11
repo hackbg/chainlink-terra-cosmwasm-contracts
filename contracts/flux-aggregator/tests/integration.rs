@@ -105,6 +105,14 @@ fn get_oracle_count(deps: &mut Instance<MockStorage, MockApi, MockQuerier<Empty>
     count.unwrap()
 }
 
+fn get_oracles(deps: &mut Instance<MockStorage, MockApi, MockQuerier<Empty>>) -> Vec<HumanAddr> {
+    let oracle_query = QueryMsg::GetOracles {};
+    let res = query(deps, oracle_query).unwrap();
+    let oracles: StdResult<Vec<HumanAddr>> = from_binary(&res).unwrap();
+
+    oracles.unwrap()
+}
+
 #[test]
 fn test_add_oracles() {
     let (mut deps, env) = default_init();
@@ -126,6 +134,43 @@ fn test_add_oracles() {
 
     let new_count = get_oracle_count(&mut deps);
     assert_eq!(new_count, 1);
+}
+
+#[test]
+fn test_remove_oracles() {
+    let (mut deps, env) = default_init();
+
+    let oracle = HumanAddr::from("oracle");
+    let oracle_to_remove = HumanAddr::from("oracle_to_remove");
+    let oracles = vec![oracle.clone(), oracle_to_remove.clone()];
+    let msg = HandleMsg::ChangeOracles {
+        removed: vec![],
+        added: oracles.clone(),
+        added_admins: oracles.clone(),
+        min_submissions: oracles.len() as u32,
+        max_submissions: oracles.len() as u32,
+        restart_delay: RESTART_DELAY,
+    };
+    let _: HandleResponse = handle(&mut deps, env.clone(), msg).unwrap();
+
+    let old_count = get_oracle_count(&mut deps);
+    assert_eq!(old_count, 2);
+
+    let msg = HandleMsg::ChangeOracles {
+        removed: vec![oracle_to_remove],
+        added: vec![],
+        added_admins: vec![],
+        min_submissions: MIN_ANS,
+        max_submissions: MAX_ANS,
+        restart_delay: RESTART_DELAY,
+    };
+    let _: HandleResponse = handle(&mut deps, env.clone(), msg).unwrap();
+
+    let new_count = get_oracle_count(&mut deps);
+    assert_eq!(new_count, 1);
+
+    let remaining_oracles = get_oracles(&mut deps);
+    assert_eq!(vec![oracle], remaining_oracles);
 }
 
 struct CustomQuerier {

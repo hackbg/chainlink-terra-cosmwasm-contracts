@@ -1,7 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use chainlink_contract_utils::modifier::Immutable;
 use cosmwasm_std::{CanonicalAddr, Storage, Uint128};
 use cosmwasm_storage::{
     bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
@@ -15,6 +14,7 @@ pub static ORACLE_ADDRESSES_KEY: &[u8] = b"oracle_addr";
 pub static RECORDED_FUNDS_KEY: &[u8] = b"recorded_funds";
 pub static PREFIX_REQUESTERS: &[u8] = b"requesters";
 pub static PREFIX_ROUND: &[u8] = b"round";
+pub static PREFIX_DETAILS: &[u8] = b"details";
 pub static LATEST_ROUND_ID_KEY: &[u8] = b"latest_round_id";
 pub static REPORTING_ROUND_ID_KEY: &[u8] = b"reporting_round_id";
 
@@ -39,39 +39,8 @@ pub struct State {
     pub decimals: u8,
     pub description: String,
 
-    min_submission_value: Immutable<Uint128>,
-    max_submission_value: Immutable<Uint128>,
-}
-
-impl State {
-    #[allow(clippy::clippy::too_many_arguments)]
-    pub fn new(
-        link: CanonicalAddr,
-        validator: CanonicalAddr,
-        payment_amount: Uint128,
-        max_submission_count: u32,
-        min_submission_count: u32,
-        restart_delay: u32,
-        timeout: u32,
-        decimals: u8,
-        description: String,
-        min_submission_value: Uint128, // int256
-        max_submission_value: Uint128, // int256
-    ) -> Self {
-        Self {
-            link,
-            validator,
-            payment_amount,
-            max_submission_count,
-            min_submission_count,
-            restart_delay,
-            timeout,
-            decimals,
-            description,
-            min_submission_value: Immutable::new(min_submission_value),
-            max_submission_value: Immutable::new(max_submission_value),
-        }
-    }
+    pub min_submission_value: Uint128,
+    pub max_submission_value: Uint128,
 }
 
 pub fn config<S: Storage>(storage: &mut S) -> Singleton<S, State> {
@@ -81,6 +50,7 @@ pub fn config<S: Storage>(storage: &mut S) -> Singleton<S, State> {
 pub fn config_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, State> {
     singleton_read(storage, CONFIG_KEY)
 }
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 pub struct OracleStatus {
     pub withdrawable: Uint128,
@@ -127,6 +97,23 @@ pub fn rounds_read<S: Storage>(storage: &S) -> ReadonlyBucket<S, Round> {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct RoundDetails {
+    pub submissions: Vec<Uint128>, // int256[]
+    pub max_submissions: u32,
+    pub min_submissions: u32,
+    pub timeout: u32,
+    pub payment_amount: Uint128,
+}
+
+pub fn details<S: Storage>(storage: &mut S) -> Bucket<S, RoundDetails> {
+    bucket(&PREFIX_DETAILS, storage)
+}
+
+pub fn details_read<S: Storage>(storage: &S) -> ReadonlyBucket<S, RoundDetails> {
+    bucket_read(&PREFIX_DETAILS, storage)
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 pub struct Requester {
     pub authorized: bool,
     pub delay: u32,

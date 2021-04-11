@@ -28,19 +28,19 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     let validator = deps.api.canonical_address(&msg.validator)?;
     owner(&mut deps.storage).save(&sender)?;
 
-    config(&mut deps.storage).save(&State::new(
+    config(&mut deps.storage).save(&State {
         link,
         validator,
-        msg.payment_amount,
-        0,
-        0,
-        0,
-        msg.timeout,
-        msg.decimals,
-        msg.description.clone(),
-        msg.min_submission_value,
-        msg.max_submission_value,
-    ))?;
+        payment_amount: msg.payment_amount,
+        min_submission_count: 0,
+        max_submission_count: 0,
+        restart_delay: 0,
+        timeout: msg.timeout,
+        decimals: msg.decimals,
+        description: msg.description.clone(),
+        min_submission_value: msg.min_submission_value,
+        max_submission_value: msg.max_submission_value,
+    })?;
 
     rounds(&mut deps.storage).save(
         &0_u32.to_be_bytes(), // TODO: this should be improved
@@ -123,15 +123,207 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
 }
 
 pub fn handle_submit<S: Storage, A: Api, Q: Querier>(
-    _deps: &mut Extern<S, A, Q>,
-    _env: Env,
-    _round_id: u32,
-    _submission: Uint128,
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    round_id: u32,
+    submission: Uint128,
 ) -> StdResult<HandleResponse> {
-    todo!()
+    let State {
+        min_submission_value,
+        max_submission_value,
+        restart_delay,
+        ..
+    } = config_read(&deps.storage).load()?;
+    if submission < min_submission_value {
+        return Err(StdError::generic_err("Value under threshold"));
+    }
+    if submission > max_submission_value {
+        return Err(StdError::generic_err("Value over threshold"));
+    }
+    let sender_addr = deps.api.canonical_address(&env.message.sender)?;
+    validate_oracle_round(&deps.storage, sender_addr.clone(), round_id, env.block.time)?;
+
+    let messages = vec![];
+    let sender_key = sender_addr.as_slice();
+    let round_key = &round_id.to_be_bytes();
+
+    let reporting_round = reporting_round_id_read(&deps.storage).load()?;
+    let mut oracle = oracles_read(&deps.storage).load(sender_key)?;
+    // if new round
+    if round_id == reporting_round + 1 {
+        // if delay requirement is met
+        if oracle.last_started_round.is_none()
+            || round_id > oracle.last_started_round.unwrap() + restart_delay
+        {
+            initialize_new_round(&mut deps.storage, round_id, env.block.time)?;
+            oracle.last_started_round = Some(round_id);
+        }
+    }
+    // record submission
+    if !is_accepting_submissions(&deps.storage, round_id)? {
+        return Err(StdError::generic_err("Round not accepting submissions"));
+    }
+    let mut round_details = details(&mut deps.storage).load(round_key)?;
+    round_details.submissions.push(submission);
+    oracle.last_reported_round = Some(round_id);
+    oracle.latest_submission = Some(submission);
+
+    // update round answer
+    if (round_details.submissions.len() as u32) >= round_details.min_submissions {
+        //   int256 newAnswer = Median.calculateInplace(details[_roundId].submissions);
+        let new_answer = Uint128::zero(); // TODO: median
+        rounds(&mut deps.storage).update(round_key, |round| {
+            Ok(Round {
+                answer: Some(new_answer),
+                started_at: round.unwrap().started_at,
+                updated_at: Some(env.block.time),
+                answered_in_round: round_id,
+            })
+        })?;
+        latest_round_id(&mut deps.storage).save(&round_id)?;
+        // TODO: emit AnswerUpdated(newAnswer, _roundId, now);
+
+        // TODO: send new value to validator
+        // messages.push(FlaggingValidatorMsg::ValidateAnwer)
+    }
+    // pay oracle
+    let payment = round_details.payment_amount;
+    recorded_funds(&mut deps.storage).update(|funds| {
+        Ok(Funds {
+            available: (funds.available - payment)?,
+            allocated: funds.allocated + payment,
+        })
+    })?;
+    oracle.withdrawable += payment;
+
+    oracles(&mut deps.storage).save(sender_key, &oracle)?;
+
+    // save or delete round details
+    if (round_details.submissions.len() as u32) < round_details.max_submissions {
+        details(&mut deps.storage).save(round_key, &round_details)?;
+    } else {
+        details(&mut deps.storage).remove(round_key);
+    }
+
+    Ok(HandleResponse {
+        messages,
+        log: vec![],
+        data: None,
+    })
 }
 
-#[allow(clippy::clippy::too_many_arguments)]
+fn validate_oracle_round<S: Storage>(
+    storage: &S,
+    oracle: CanonicalAddr,
+    round_id: u32,
+    timestamp: u64,
+) -> StdResult<()> {
+    let oracle = oracles_read(storage).load(oracle.as_slice())?;
+    let rr_id = reporting_round_id_read(storage).load()?;
+
+    if oracle.starting_round == 0 {
+        return ContractErr::OracleNotEnabled.std_err();
+    }
+    if oracle.starting_round > round_id {
+        return ContractErr::OracleNotYetEnabled.std_err();
+    }
+    if oracle.ending_round < round_id {
+        return Err(StdError::generic_err("No longer allowed oracle"));
+    }
+    if oracle.last_reported_round.unwrap() >= round_id {
+        return Err(StdError::generic_err("Cannot report on previous rounds"));
+    }
+    let rr_updated_at = rounds_read(storage).load(&rr_id.to_be_bytes())?.updated_at;
+    let unanswered = round_id + 1 == rr_id && rr_updated_at.is_none();
+    if round_id != rr_id && round_id != rr_id + 1 && !unanswered {
+        return Err(StdError::generic_err("Invalid round to report"));
+    }
+    if round_id != 1 && !is_supersedable(storage, prev_round_id(round_id)?, timestamp)? {
+        return Err(StdError::generic_err("Previous round not supersedable"));
+    }
+    Ok(())
+}
+
+fn is_supersedable<S: Storage>(storage: &S, round_id: u32, timestamp: u64) -> StdResult<bool> {
+    let round = rounds_read(storage).load(&round_id.to_be_bytes())?;
+    Ok(round.updated_at.unwrap() > 0 || timed_out(storage, round_id, timestamp)?)
+}
+
+fn timed_out<S: Storage>(storage: &S, round_id: u32, timestamp: u64) -> StdResult<bool> {
+    let started_at = rounds_read(storage)
+        .load(&round_id.to_be_bytes())?
+        .started_at;
+    let round_timeout = details_read(storage).load(&round_id.to_be_bytes())?.timeout as u64;
+    Ok(
+        started_at.is_some()
+            && round_timeout > 0
+            && started_at.unwrap() + round_timeout < timestamp,
+    )
+}
+
+fn initialize_new_round<S: Storage>(
+    storage: &mut S,
+    round_id: u32,
+    timestamp: u64,
+) -> StdResult<()> {
+    // update round info if timed out
+    let timed_out_round = prev_round_id(round_id)?;
+    if timed_out(storage, timed_out_round, timestamp)? {
+        let prev_round_id = prev_round_id(timed_out_round)?;
+        let prev_round = rounds_read(storage).load(&prev_round_id.to_be_bytes())?;
+        rounds(storage).update(&timed_out_round.to_be_bytes(), |round| {
+            Ok(Round {
+                answer: prev_round.answer,
+                answered_in_round: prev_round.answered_in_round,
+                updated_at: Some(timestamp),
+                ..round.unwrap()
+            })
+        })?;
+        details(storage).remove(&timed_out_round.to_be_bytes());
+    }
+
+    reporting_round_id(storage).save(&round_id)?;
+    let State {
+        min_submission_count,
+        max_submission_count,
+        timeout,
+        payment_amount,
+        ..
+    } = config_read(storage).load()?;
+    details(storage).save(
+        &round_id.to_be_bytes(),
+        &RoundDetails {
+            submissions: vec![],
+            max_submissions: max_submission_count,
+            min_submissions: min_submission_count,
+            timeout,
+            payment_amount,
+        },
+    )?;
+    rounds(storage).update(&round_id.to_be_bytes(), |round| {
+        Ok(Round {
+            started_at: Some(timestamp),
+            ..round.unwrap()
+        })
+    })?;
+
+    // TODO: add event
+    Ok(())
+}
+
+fn prev_round_id(round_id: u32) -> StdResult<u32> {
+    round_id
+        .checked_sub(1)
+        .ok_or_else(|| StdError::underflow(round_id, 1))
+}
+
+fn is_accepting_submissions<S: Storage>(storage: &S, round_id: u32) -> StdResult<bool> {
+    details_read(storage)
+        .load(&round_id.to_be_bytes())
+        .map(|details| details.max_submissions == 0)
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn handle_change_oracles<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
@@ -183,7 +375,7 @@ pub fn handle_change_oracles<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages: vec![msg.into()],
-        log: vec![],
+        log: vec![], // TODO: add logs
         data: None,
     })
 }
@@ -235,20 +427,19 @@ fn add_oracle<S: Storage>(
     let index = oracle_addresses_read(storage).load()?.len() as u16;
 
     oracles(storage).update(oracle.as_slice(), |status| {
-        let mut status = status.unwrap_or_default();
-        status.starting_round = starting_round;
-        status.ending_round = ROUND_MAX;
-        status.index = index;
-        status.admin = admin;
-
-        Ok(status)
+        Ok(OracleStatus {
+            starting_round,
+            ending_round: ROUND_MAX,
+            index,
+            admin,
+            ..status.unwrap_or_default()
+        })
     })?;
     oracle_addresses(storage).update(|mut addreses| {
         addreses.push(oracle);
         Ok(addreses)
     })?;
 
-    // TODO: add logs
     Ok(())
 }
 
@@ -505,14 +696,15 @@ pub fn handle_update_future_rounds<S: Storage, A: Api, Q: Querier>(
         return ContractErr::MinLessThanZero.std_err();
     }
 
-    config(&mut deps.storage).update(|mut state| {
-        state.payment_amount = payment_amount;
-        state.min_submission_count = min_submissions;
-        state.max_submission_count = max_submissions;
-        state.restart_delay = restart_delay;
-        state.timeout = timeout;
-
-        Ok(state)
+    config(&mut deps.storage).update(|state| {
+        Ok(State {
+            payment_amount,
+            min_submission_count: min_submissions,
+            max_submission_count: max_submissions,
+            restart_delay,
+            timeout,
+            ..state
+        })
     })?;
 
     Ok(HandleResponse {
@@ -692,4 +884,15 @@ fn validate_ownership<S: Storage, A: Api, Q: Querier>(
         return ContractErr::NotOwner.std_err();
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_prev_round_id() {
+        assert_eq!(prev_round_id(1), Ok(0));
+        assert_eq!(prev_round_id(0), Err(StdError::underflow(0, 1)));
+    }
 }
