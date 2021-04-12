@@ -96,7 +96,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             handle_transfer_admin(deps, env, oracle, new_admin)
         }
         HandleMsg::AcceptAdmin { oracle } => handle_accept_admin(deps, env, oracle),
-        HandleMsg::RequestNewRound {} => todo!(),
+        HandleMsg::RequestNewRound {} => handle_request_new_round(deps, env),
         HandleMsg::SetRequesterPermissions {
             requester,
             authorized,
@@ -510,6 +510,48 @@ pub fn handle_accept_admin<S: Storage, A: Api, Q: Querier>(
             log("new_admin", env.message.sender),
         ],
         data: None,
+    })
+}
+
+pub fn handle_request_new_round<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+) -> StdResult<HandleResponse> {
+    let sender_addr = deps.api.canonical_address(&env.message.sender)?;
+    let requester = requesters_read(&deps.storage).load(sender_addr.as_slice())?;
+    if !requester.authorized {
+        return Err(StdError::generic_err("Unauthorized requester"));
+    }
+    let current_round_id = reporting_round_id_read(&deps.storage).load()?;
+    let current_round = rounds_read(&deps.storage).load(&current_round_id.to_be_bytes())?;
+    if current_round.updated_at.is_some()
+        && timed_out(&deps.storage, current_round_id, env.block.time)?
+    {
+        return Err(StdError::generic_err("Previous round not supersedable"));
+    }
+
+    let new_round_id = current_round_id + 1;
+    if new_round_id <= requester.last_started_round + requester.delay
+        && requester.last_started_round != 0
+    {
+        return Err(StdError::generic_err("Delay not respected"));
+    }
+
+    initialize_new_round(&mut deps.storage, new_round_id, env.block.time)?;
+
+    requesters(&mut deps.storage).save(
+        sender_addr.as_slice(),
+        &Requester {
+            last_started_round: new_round_id,
+            ..requester
+        },
+    )?;
+
+    let round_id_serialized = to_binary(&new_round_id)?; // TODO: maybe wrap in object
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![],
+        data: Some(round_id_serialized),
     })
 }
 
