@@ -132,39 +132,73 @@ pub fn handle_submit<S: Storage, A: Api, Q: Querier>(
     let State {
         min_submission_value,
         max_submission_value,
+        min_submission_count,
+        max_submission_count,
         restart_delay,
+        timeout,
+        payment_amount,
         ..
     } = config_read(&deps.storage).load()?;
     if submission < min_submission_value {
-        return Err(StdError::generic_err("Value under threshold"));
+        return ContractErr::UnderMin.std_err();
     }
     if submission > max_submission_value {
-        return Err(StdError::generic_err("Value over threshold"));
+        return ContractErr::OverMax.std_err();
     }
     let sender_addr = deps.api.canonical_address(&env.message.sender)?;
-    validate_oracle_round(&deps.storage, sender_addr.clone(), round_id, env.block.time)?;
+    // validate_oracle_round(&deps.storage, sender_addr.clone(), round_id, env.block.time)?;
 
     let messages = vec![];
+    let timestamp = env.block.time;
     let sender_key = sender_addr.as_slice();
     let round_key = &round_id.to_be_bytes();
 
     let reporting_round = reporting_round_id_read(&deps.storage).load()?;
     let mut oracle = oracles_read(&deps.storage).load(sender_key)?;
-    // if new round
-    if round_id == reporting_round + 1 {
-        // if delay requirement is met
-        if oracle.last_started_round.is_none()
-            || round_id > oracle.last_started_round.unwrap() + restart_delay
-        {
-            initialize_new_round(&mut deps.storage, round_id, env.block.time)?;
-            oracle.last_started_round = Some(round_id);
-        }
+    let mut round = rounds_read(&deps.storage)
+        .load(round_key)
+        .unwrap_or_default();
+    let mut round_details: RoundDetails;
+
+    // if new round and delay requirement is met
+    if round_id == reporting_round + 1
+        && (oracle.last_started_round.is_none()
+            || round_id > oracle.last_started_round.unwrap() + restart_delay)
+    {
+        // TODO:
+        // update round info if timed out
+        // let timed_out_round = prev_round_id(round_id)?;
+        // if timed_out(&deps.storage, timed_out_round, env.block.time)? {
+        //     let prev_round_id = prev_round_id(timed_out_round)?;
+        //     let prev_round = rounds_read(&mut deps.storage).load(&prev_round_id.to_be_bytes())?;
+        //     rounds(&mut deps.storage).update(&timed_out_round.to_be_bytes(), |round| {
+        //         Ok(Round {
+        //             answer: prev_round.answer,
+        //             answered_in_round: prev_round.answered_in_round,
+        //             updated_at: Some(timestamp),
+        //             ..round.unwrap()
+        //         })
+        //     })?;
+        //     details(&mut deps.storage).remove(&timed_out_round.to_be_bytes());
+        // }
+        reporting_round_id(&mut deps.storage).save(&round_id)?;
+        round_details = RoundDetails {
+            submissions: vec![],
+            max_submissions: max_submission_count,
+            min_submissions: min_submission_count,
+            timeout,
+            payment_amount,
+        };
+        round.started_at = Some(timestamp);
+
+        oracle.last_started_round = Some(round_id);
+    } else {
+        round_details = details_read(&deps.storage).load(round_key)?;
     }
     // record submission
-    if !is_accepting_submissions(&deps.storage, round_id)? {
+    if !is_accepting_submissions(&round_details) {
         return Err(StdError::generic_err("Round not accepting submissions"));
     }
-    let mut round_details = details(&mut deps.storage).load(round_key)?;
     round_details.submissions.push(submission);
     oracle.last_reported_round = Some(round_id);
     oracle.latest_submission = Some(submission);
@@ -178,14 +212,15 @@ pub fn handle_submit<S: Storage, A: Api, Q: Querier>(
             .collect::<Vec<u128>>();
         let new_answer = calculate_median(&mut submissions)
             .map_err(|_| StdError::generic_err("No submissions"))?;
-        rounds(&mut deps.storage).update(round_key, |round| {
-            Ok(Round {
+        rounds(&mut deps.storage).save(
+            round_key,
+            &Round {
                 answer: Some(Uint128(new_answer)),
-                started_at: round.unwrap().started_at,
-                updated_at: Some(env.block.time),
+                started_at: round.started_at,
+                updated_at: Some(timestamp),
                 answered_in_round: round_id,
-            })
-        })?;
+            },
+        )?;
         latest_round_id(&mut deps.storage).save(&round_id)?;
         // TODO: emit AnswerUpdated(newAnswer, _roundId, now);
 
@@ -309,7 +344,7 @@ fn initialize_new_round<S: Storage>(
     rounds(storage).update(&round_id.to_be_bytes(), |round| {
         Ok(Round {
             started_at: Some(timestamp),
-            ..round.unwrap()
+            ..round.unwrap_or_default()
         })
     })?;
 
@@ -323,10 +358,8 @@ fn prev_round_id(round_id: u32) -> StdResult<u32> {
         .ok_or_else(|| StdError::underflow(round_id, 1))
 }
 
-fn is_accepting_submissions<S: Storage>(storage: &S, round_id: u32) -> StdResult<bool> {
-    details_read(storage)
-        .load(&round_id.to_be_bytes())
-        .map(|details| details.max_submissions == 0)
+fn is_accepting_submissions(details: &RoundDetails) -> bool {
+    details.max_submissions == 0
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -432,15 +465,16 @@ fn add_oracle<S: Storage>(
     };
     let index = oracle_addresses_read(storage).load()?.len() as u16;
 
-    oracles(storage).update(oracle.as_slice(), |status| {
-        Ok(OracleStatus {
+    oracles(storage).save(
+        oracle.as_slice(),
+        &OracleStatus {
             starting_round,
             ending_round: ROUND_MAX,
             index,
             admin,
-            ..status.unwrap_or_default()
-        })
-    })?;
+            ..oracle_status
+        },
+    )?;
     oracle_addresses(storage).update(|mut addreses| {
         addreses.push(oracle);
         Ok(addreses)
@@ -573,12 +607,13 @@ pub fn handle_withdraw_payment<S: Storage, A: Api, Q: Querier>(
         return ContractErr::InsufficientWithdrawableFunds.std_err();
     }
 
-    oracles(&mut deps.storage).update(oracle.as_slice(), |status| {
-        let mut status = status.unwrap_or_default();
-        let new_withdrawable = (status.withdrawable - amount)?;
-        status.withdrawable = new_withdrawable;
-        Ok(status)
-    })?;
+    oracles(&mut deps.storage).save(
+        oracle.as_slice(),
+        &OracleStatus {
+            withdrawable: (oracle_status.withdrawable - amount)?,
+            ..oracle_status
+        },
+    )?;
     recorded_funds(&mut deps.storage).update(|mut funds| {
         funds.allocated = (funds.allocated - amount)?;
         Ok(funds)
@@ -654,14 +689,12 @@ pub fn handle_update_available_funds<S: Storage, A: Api, Q: Querier>(
     let funds = recorded_funds_read(&deps.storage).load()?;
     let now_available = (prev_available.balance - funds.allocated)?;
 
-    // Does this offer us benefits?
     if funds.available == now_available {
         return Ok(HandleResponse::default());
     }
-
-    recorded_funds(&mut deps.storage).update(|mut funds| {
-        funds.available = now_available;
-        Ok(funds)
+    recorded_funds(&mut deps.storage).save(&Funds {
+        available: now_available,
+        allocated: funds.allocated,
     })?;
 
     Ok(HandleResponse {
@@ -684,22 +717,23 @@ pub fn handle_set_requester_permissions<S: Storage, A: Api, Q: Querier>(
     validate_ownership(deps, &env)?;
 
     let requester_addr = deps.api.canonical_address(&requester)?;
-    let curr_requester = requesters_read(&deps.storage).load(requester_addr.as_slice())?;
+    let requester_key = requester_addr.as_slice();
+    let curr_requester = requesters_read(&deps.storage).load(requester_key)?;
 
     if curr_requester.authorized == authorized {
         return Ok(HandleResponse::default());
     }
     if authorized {
-        requesters(&mut deps.storage).update(requester_addr.as_slice(), |requester| {
-            let requester = requester.unwrap(); // TODO: handling
-            Ok(Requester {
+        requesters(&mut deps.storage).save(
+            requester_key,
+            &Requester {
                 authorized,
                 delay,
-                last_started_round: requester.last_started_round,
-            })
-        })?;
+                ..curr_requester
+            },
+        )?;
     } else {
-        requesters(&mut deps.storage).remove(requester_addr.as_slice());
+        requesters(&mut deps.storage).remove(requester_key);
     }
 
     Ok(HandleResponse {
@@ -782,9 +816,11 @@ pub fn handle_set_validator<S: Storage, A: Api, Q: Querier>(
         return Ok(HandleResponse::default());
     }
 
-    config(&mut deps.storage).update(|mut state| {
-        state.validator = validator_addr;
-        Ok(state)
+    config(&mut deps.storage).update(|state| {
+        Ok(State {
+            validator: validator_addr,
+            ..state
+        })
     })?;
 
     Ok(HandleResponse {
@@ -839,9 +875,15 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::GetRoundData { round_id } => to_binary(&get_round_data(deps, round_id)),
         QueryMsg::GetLatestRoundData {} => to_binary(&get_latest_round_data(deps)),
         QueryMsg::GetOracleRoundState {
-            oracle: _,
-            queried_round_id: _,
-        } => todo!(),
+            oracle,
+            queried_round_id,
+            timestamp,
+        } => to_binary(&get_oracle_round_state(
+            deps,
+            oracle,
+            queried_round_id,
+            timestamp,
+        )),
     }
 }
 
@@ -920,6 +962,63 @@ pub fn get_latest_round_data<S: Storage, A: Api, Q: Querier>(
     let round_id = latest_round_id_read(&deps.storage).load()?;
 
     get_round_data(deps, round_id)
+}
+
+pub fn get_oracle_round_state<S: Storage, A: Api, Q: Querier>(
+    _deps: &Extern<S, A, Q>,
+    _oracle: HumanAddr,
+    _queried_round_id: u32,
+    _timestamp: u64, // Sending a timestamp from the client might not be a valid solution
+) -> StdResult<OracleRoundStateResponse> {
+    todo!()
+    // let oracle_addr = deps.api.canonical_address(&oracle)?;
+
+    // let oracle_count = get_oracle_count(deps)?;
+
+    // if queried_round_id > 0 {
+    //     let round_key = &queried_round_id.to_be_bytes();
+    //     let round = rounds_read(&deps.storage).load(round_key)?;
+    //     let round_details = details_read(&deps.storage).load(round_key)?;
+    //     let oracle_status = oracles_read(&deps.storage).load(oracle_addr.as_slice())?;
+    //     let available_funds = recorded_funds_read(&deps.storage).load()?.available;
+    //     let State {
+    //         restart_delay,
+    //         payment_amount,
+    //         ..
+    //     } = config_read(&deps.storage).load()?;
+
+    //     let is_elegible = if round.started_at.unwrap() > 0 {
+    //         is_accepting_submissions(&deps.storage, queried_round_id)?
+    //             && validate_oracle_round(&deps.storage, oracle_addr, queried_round_id, timestamp)
+    //                 .is_ok()
+    //     } else {
+    //         let is_delayed = queried_round_id
+    //             > oracle_status.last_started_round.unwrap() + restart_delay
+    //             || oracle_status.last_started_round.unwrap() == 0;
+
+    //         is_delayed
+    //             && validate_oracle_round(&deps.storage, oracle_addr, queried_round_id, timestamp)
+    //                 .is_ok()
+    //     };
+    //     let payment = if round.started_at.unwrap() > 0 {
+    //         round_details.payment_amount
+    //     } else {
+    //         payment_amount
+    //     };
+
+    //     Ok(OracleRoundStateResponse {
+    //         elegible_to_submit: is_elegible,
+    //         round_id: queried_round_id,
+    //         latest_submission: oracle_status.latest_submission,
+    //         started_at: round.started_at.unwrap(),
+    //         timeout: round_details.timeout,
+    //         available_funds,
+    //         oracle_count,
+    //         payment_amount: payment,
+    //     })
+    // } else {
+    //     unimplemented!()
+    // }
 }
 
 fn validate_ownership<S: Storage, A: Api, Q: Querier>(

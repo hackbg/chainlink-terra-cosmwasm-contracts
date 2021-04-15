@@ -80,7 +80,7 @@ pub fn oracle_addresses_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, Ve
     singleton_read(storage, ORACLE_ADDRESSES_KEY)
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 pub struct Round {
     pub answer: Option<Uint128>, // int256,
     pub started_at: Option<u64>,

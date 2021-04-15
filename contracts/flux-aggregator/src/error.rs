@@ -15,6 +15,12 @@ pub enum ContractErr {
     /// No data present
     #[error("No data present")]
     NoData,
+    /// Value under threshold
+    #[error("Value under threshold")]
+    UnderMin,
+    /// Value over threshold
+    #[error("Value over threshold")]
+    OverMax,
     /// Only callable by owner
     #[error("Only callable by owner")]
     NotOwner,

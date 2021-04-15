@@ -86,6 +86,7 @@ pub enum QueryMsg {
     GetOracleRoundState {
         oracle: HumanAddr,
         queried_round_id: u32,
+        timestamp: u64,
     },
 }
 
@@ -100,12 +101,12 @@ pub struct RoundDataResponse {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct OracleRoundStateResponse {
-    pub elegible_to_submit: bool,   // bool
-    pub round_id: u32,              // uint32
-    pub latest_submission: Uint128, // int256
-    pub started_at: u64,            // uint64
-    pub timeout: u64,               // uint64
-    pub available_funds: Uint128,   // uint128
-    pub oracle_count: u8,           // uint8
-    pub payment_amount: Uint128,    // uint128
+    pub elegible_to_submit: bool,           // bool
+    pub round_id: u32,                      // uint32
+    pub latest_submission: Option<Uint128>, // int256
+    pub started_at: u64,                    // uint64
+    pub timeout: u32,                       // uint64
+    pub available_funds: Uint128,           // uint128
+    pub oracle_count: u8,                   // uint8
+    pub payment_amount: Uint128,            // uint128
 }
