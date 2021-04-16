@@ -21,7 +21,7 @@ serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 snafu = { version = "0.6.3" }
 num-bigint = { version = "0.4", features = ["serde"] }
 cw20 = { version = "0.2.3" }
-link-token = { path = "../link-token"}
+link-token = { path = "../link-token", default-features=false}
 chainlink-contract-utils = { path = "../chainlink-contract-utils"}
 
 [dev-dependencies]

@@ -127,3 +127,97 @@ fn get_owner<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResul
     to_binary(&resp)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
+    use cosmwasm_std::{coins, from_binary, HumanAddr};
+
+    #[test]
+    fn proper_initialization() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let msg = InitMsg {};
+        let env = mock_env("creator", &coins(1000, "earth"));
+
+        let sender = deps.api.canonical_address(&env.message.sender).unwrap();
+        // we can just call .unwrap() to assert this was a success
+        let res = init(&mut deps, env, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // it worked, let's query the state
+        let res = query(&deps, QueryMsg::GetOwner {}).unwrap();
+        let value: ConfigResponse = from_binary(&res).unwrap();
+        assert_eq!(true, CanonicalAddr::eq(&sender, &value.owner));
+    }
+
+    #[test]
+    fn transfer_ownership() {
+        let mut deps = mock_dependencies(20, &[]);
+        let env = mock_env("creator", &coins(1000, "earth"));
+
+        let msg = InitMsg {};
+
+        let res: InitResponse = init(&mut deps, env.clone(), msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let mock_addr = deps
+            .api
+            .canonical_address(&HumanAddr::from(MOCK_CONTRACT_ADDR))
+            .unwrap();
+
+        let msg = HandleMsg::TransferOwnership {
+            to: mock_addr.clone(),
+        };
+
+        let res = handle(&mut deps, env, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let res = query(&deps, QueryMsg::GetOwner {}).unwrap();
+        let value: ConfigResponse = from_binary(&res).unwrap();
+        assert_eq!(
+            true,
+            CanonicalAddr::eq(&mock_addr, &value.pending_owner.unwrap())
+        );
+    }
+
+    #[test]
+    fn accept_ownership() {
+        let mut deps = mock_dependencies(20, &[]);
+        let env = mock_env("creator", &coins(1000, "earth"));
+
+        let msg = InitMsg {};
+
+        let res = init(&mut deps, env.clone(), msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let mock_addr = deps
+            .api
+            .canonical_address(&HumanAddr::from(MOCK_CONTRACT_ADDR))
+            .unwrap();
+
+        let msg = HandleMsg::TransferOwnership {
+            to: mock_addr.clone(),
+        };
+
+        let res = handle(&mut deps, env.clone(), msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let res = query(&deps, QueryMsg::GetOwner {}).unwrap();
+        let value: ConfigResponse = from_binary(&res).unwrap();
+        assert_eq!(
+            true,
+            CanonicalAddr::eq(&mock_addr, &value.pending_owner.unwrap())
+        );
+
+        let env = mock_env(MOCK_CONTRACT_ADDR, &coins(1000, "earth"));
+        let msg = HandleMsg::AcceptOwnership {};
+        let res = handle(&mut deps, env.clone(), msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let res = query(&deps, QueryMsg::GetOwner {}).unwrap();
+        let value: ConfigResponse = from_binary(&res).unwrap();
+        assert_eq!(true, CanonicalAddr::eq(&mock_addr, &value.owner));
+        assert_eq!(true, value.pending_owner.is_none());
+    }
+}
