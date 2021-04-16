@@ -1,9 +1,9 @@
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, InitResponse,
-    LogAttribute, Querier, StdError, StdResult, Storage,
+    log, to_binary, Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr,
+    InitResponse, LogAttribute, Querier, StdError, StdResult, Storage,
 };
 
-use crate::msg::{OwnerResponse, HandleMsg, InitMsg, QueryMsg};
+use crate::msg::{HandleMsg, InitMsg, OwnerResponse, QueryMsg};
 use crate::state::{owner, owner_read, State};
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
@@ -74,7 +74,7 @@ fn transfer_ownership<S: Storage, A: Api, Q: Querier>(
 
     Ok(vec![
         log("action", "ownership transferred"),
-        log("pending_owner", to),
+        log("pending_owner", deps.api.human_address(&to).unwrap()),
     ])
 }
 
@@ -113,7 +113,7 @@ fn accept_ownership<S: Storage, A: Api, Q: Querier>(
 
     Ok(vec![
         log("action", "ownership accepted"),
-        log("owner", sender),
+        log("owner", deps.api.human_address(&sender).unwrap()),
     ])
 }
 
