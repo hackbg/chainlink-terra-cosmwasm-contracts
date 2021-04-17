@@ -66,6 +66,12 @@ pub enum ContractErr {
     /// Delay cannot exceed total
     #[error("Delay cannot exceed total")]
     DelayGreaterThanTotal,
+    /// Cannot report on previous rounds
+    #[error("Cannot report on previous rounds")]
+    ReportingPreviousRound,
+    /// Round not accepting submissions
+    #[error("Round not accepting submissions")]
+    NotAcceptingSubmissions,
     /// Receive does not expect payload
     #[error("Receive does not expect payload")]
     UnexpectedReceivePayload,

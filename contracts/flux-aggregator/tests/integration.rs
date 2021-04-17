@@ -9,7 +9,10 @@ use cosmwasm_vm::{
     Instance,
 };
 
-use flux_aggregator::msg::{HandleMsg, InitMsg, QueryMsg};
+use flux_aggregator::{
+    error::ContractErr,
+    msg::{HandleMsg, InitMsg, QueryMsg, RoundDataResponse},
+};
 use helpers::{mock_dependencies_with_custom_querier, CustomQuerier};
 
 static WASM: &[u8] =
@@ -23,13 +26,13 @@ static DEPOSIT: Uint128 = Uint128(100);
 static ANSWER: Uint128 = Uint128(100);
 
 #[test]
-fn test_init() {
+fn successful_init() {
     // Successfull init should not panic
     let _ = default_init();
 }
 
 #[test]
-fn test_submit() {
+fn submit_funds() {
     let oracles = personas![Neil, Ned, Nelly];
     let (mut deps, _) = init_with_oracles(oracles);
 
@@ -49,11 +52,104 @@ fn test_submit() {
 
     let expected = (DEPOSIT - PAYMENT_AMOUNT).unwrap();
     let available = q!(deps, GetAvailableFunds => Uint128);
-    assert_eq!(expected, available);
+    assert_eq!(available, expected);
 }
 
 #[test]
-fn test_withdraw_funds_success() {
+fn submit_under_min_reported() {
+    let oracles = personas![Neil, Ned, Nelly];
+    let (mut deps, _) = init_with_oracles(oracles.clone());
+
+    let allocated = q!(deps, GetAllocatedFunds => Uint128);
+    assert_eq!(allocated, Uint128::zero());
+
+    let submission = HandleMsg::Submit {
+        round_id: 1,
+        submission: ANSWER,
+    };
+    let env = mock_env("Neil", &[]);
+    let _: HandleResponse = handle(&mut deps, env.clone(), submission.clone()).unwrap();
+
+    let withdrawable = q!(deps,  GetWithdrawablePayment oracle: personas!(Neil) => Uint128);
+    assert_eq!(withdrawable, PAYMENT_AMOUNT);
+
+    let withdrawable = q!(deps, GetWithdrawablePayment oracle: personas!(Ned) => Uint128);
+    assert_eq!(withdrawable, Uint128::zero());
+
+    let withdrawable = q!(deps, GetWithdrawablePayment oracle: personas!(Nelly) => Uint128);
+    assert_eq!(withdrawable, Uint128::zero());
+
+    // answer should not be updated
+    let (mut deps, _) = init_with_oracles(oracles);
+
+    let round = q!(deps, GetLatestRoundData => RoundDataResponse);
+    assert!(round.answer.is_none());
+
+    let env = mock_env("Ned", &[]);
+    let _: HandleResponse = handle(&mut deps, env.clone(), submission.clone()).unwrap();
+
+    let env = mock_env("Nelly", &[]);
+    let _: HandleResponse = handle(&mut deps, env.clone(), submission).unwrap();
+
+    let round = q!(deps, GetLatestRoundData => RoundDataResponse);
+    assert!(round.answer.is_none());
+}
+
+#[test]
+fn submit_complete_round() {
+    let oracles = personas![Ned, Nelly];
+    let (mut deps, _) = init_with_oracles(oracles.clone());
+
+    let round = q!(deps, GetLatestRoundData => RoundDataResponse);
+    assert!(round.answer.is_none());
+
+    let env = mock_env("Ned", &[]);
+    let _: HandleResponse = handle(
+        &mut deps,
+        env.clone(),
+        HandleMsg::Submit {
+            round_id: 1,
+            submission: Uint128(100),
+        },
+    )
+    .unwrap();
+
+    let round = q!(deps, GetLatestRoundData => RoundDataResponse);
+    assert!(round.answer.is_none());
+
+    let env = mock_env("Nelly", &[]);
+    let _: HandleResponse = handle(
+        &mut deps,
+        env.clone(),
+        HandleMsg::Submit {
+            round_id: 1,
+            submission: Uint128(200),
+        },
+    )
+    .unwrap();
+
+    let round = q!(deps, GetLatestRoundData => RoundDataResponse);
+    assert!(round.updated_at.is_some());
+    assert_eq!(round.answer, Some(Uint128(150))); // (100 + 200) / 2
+}
+
+#[test]
+fn submit_twice() {
+    let oracles = personas![Ned, Nelly];
+    let (mut deps, _) = init_with_oracles(oracles.clone());
+    let env = mock_env("Ned", &[]);
+    let submission = HandleMsg::Submit {
+        round_id: 1,
+        submission: ANSWER,
+    };
+
+    let _: HandleResponse = handle(&mut deps, env.clone(), &submission).unwrap();
+    let res: StdResult<HandleResponse> = handle(&mut deps, env.clone(), &submission);
+    assert_eq!(res.unwrap_err(), ContractErr::ReportingPreviousRound.std());
+}
+
+#[test]
+fn withdraw_funds_success() {
     let (mut deps, env) = default_init();
 
     let amount = Uint128(85);
@@ -86,7 +182,7 @@ fn test_withdraw_funds_success() {
 }
 
 #[test]
-fn test_add_oracles() {
+fn add_oracles() {
     let (mut deps, env) = default_init();
 
     let old_count = q!(deps, GetOracleCount => u8);
@@ -109,7 +205,7 @@ fn test_add_oracles() {
 }
 
 #[test]
-fn test_remove_oracles() {
+fn remove_oracles() {
     let (mut deps, env) = default_init();
 
     let oracle = HumanAddr::from("oracle");
@@ -186,7 +282,22 @@ fn init_with_oracles(
         max_submissions: min_max,
         restart_delay: RESTART_DELAY,
     };
-    let _: HandleResponse = handle(&mut deps, env.clone(), msg).unwrap();
+    let res: HandleResponse = handle(&mut deps, env.clone(), msg).unwrap();
 
-    (deps, env)
+    if let CosmosMsg::Wasm(msg) = res.messages.get(0).unwrap() {
+        if let WasmMsg::Execute { msg, .. } = msg {
+            let _res: HandleResponse = handle(
+                &mut deps,
+                env.clone(),
+                &from_binary::<HandleMsg>(msg).unwrap(),
+            )
+            .unwrap();
+
+            // println!("{:?}", res.log);
+
+            return (deps, env);
+        }
+        panic!()
+    }
+    panic!()
 }

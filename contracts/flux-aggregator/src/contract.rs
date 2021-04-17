@@ -146,41 +146,42 @@ pub fn handle_submit<S: Storage, A: Api, Q: Querier>(
         return ContractErr::OverMax.std_err();
     }
     let sender_addr = deps.api.canonical_address(&env.message.sender)?;
-    // validate_oracle_round(&deps.storage, sender_addr.clone(), round_id, env.block.time)?;
-
     let messages = vec![];
+    let mut logs = vec![];
     let timestamp = env.block.time;
     let sender_key = sender_addr.as_slice();
     let round_key = &round_id.to_be_bytes();
 
-    let reporting_round = reporting_round_id_read(&deps.storage).load()?;
     let mut oracle = oracles_read(&deps.storage).load(sender_key)?;
+
+    let rr_id = reporting_round_id_read(&deps.storage).load()?;
+    validate_oracle_round(&deps.storage, &oracle, round_id, rr_id, timestamp)?;
+
     let mut round = rounds_read(&deps.storage)
-        .load(round_key)
+        .may_load(round_key)?
         .unwrap_or_default();
     let mut round_details: RoundDetails;
 
     // if new round and delay requirement is met
-    if round_id == reporting_round + 1
+    if round_id == rr_id + 1
         && (oracle.last_started_round.is_none()
             || round_id > oracle.last_started_round.unwrap() + restart_delay)
     {
-        // TODO:
         // update round info if timed out
-        // let timed_out_round = prev_round_id(round_id)?;
-        // if timed_out(&deps.storage, timed_out_round, env.block.time)? {
-        //     let prev_round_id = prev_round_id(timed_out_round)?;
-        //     let prev_round = rounds_read(&mut deps.storage).load(&prev_round_id.to_be_bytes())?;
-        //     rounds(&mut deps.storage).update(&timed_out_round.to_be_bytes(), |round| {
-        //         Ok(Round {
-        //             answer: prev_round.answer,
-        //             answered_in_round: prev_round.answered_in_round,
-        //             updated_at: Some(timestamp),
-        //             ..round.unwrap()
-        //         })
-        //     })?;
-        //     details(&mut deps.storage).remove(&timed_out_round.to_be_bytes());
-        // }
+        let timed_out_round = prev_round_id(round_id)?;
+        if timed_out(&deps.storage, timed_out_round, env.block.time).unwrap_or(false) {
+            let prev_round_id = prev_round_id(timed_out_round)?;
+            let prev_round = rounds_read(&deps.storage).load(&prev_round_id.to_be_bytes())?;
+            rounds(&mut deps.storage).update(&timed_out_round.to_be_bytes(), |round| {
+                Ok(Round {
+                    answer: prev_round.answer,
+                    answered_in_round: prev_round.answered_in_round,
+                    updated_at: Some(timestamp),
+                    ..round.unwrap()
+                })
+            })?;
+            details(&mut deps.storage).remove(&timed_out_round.to_be_bytes());
+        }
         reporting_round_id(&mut deps.storage).save(&round_id)?;
         round_details = RoundDetails {
             submissions: vec![],
@@ -190,6 +191,12 @@ pub fn handle_submit<S: Storage, A: Api, Q: Querier>(
             payment_amount,
         };
         round.started_at = Some(timestamp);
+        rounds(&mut deps.storage).save(round_key, &round)?;
+        logs.extend_from_slice(&[
+            log("action", "new round"),
+            log("started by", &env.message.sender),
+            log("started at", timestamp),
+        ]);
 
         oracle.last_started_round = Some(round_id);
     } else {
@@ -197,7 +204,7 @@ pub fn handle_submit<S: Storage, A: Api, Q: Querier>(
     }
     // record submission
     if !is_accepting_submissions(&round_details) {
-        return Err(StdError::generic_err("Round not accepting submissions"));
+        return ContractErr::NotAcceptingSubmissions.std_err();
     }
     round_details.submissions.push(submission);
     oracle.last_reported_round = Some(round_id);
@@ -222,7 +229,11 @@ pub fn handle_submit<S: Storage, A: Api, Q: Querier>(
             },
         )?;
         latest_round_id(&mut deps.storage).save(&round_id)?;
-        // TODO: emit AnswerUpdated(newAnswer, _roundId, now);
+        logs.extend_from_slice(&[
+            log("action", "answer updated"),
+            log("current", Uint128(new_answer)),
+            log("round_id", round_id),
+        ]);
 
         // TODO: send new value to validator
         // messages.push(FlaggingValidatorMsg::ValidateAnwer)
@@ -248,20 +259,18 @@ pub fn handle_submit<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages,
-        log: vec![],
+        log: logs,
         data: None,
     })
 }
 
 fn validate_oracle_round<S: Storage>(
     storage: &S,
-    oracle: CanonicalAddr,
+    oracle: &OracleStatus,
     round_id: u32,
+    rr_id: u32,
     timestamp: u64,
 ) -> StdResult<()> {
-    let oracle = oracles_read(storage).load(oracle.as_slice())?;
-    let rr_id = reporting_round_id_read(storage).load()?;
-
     if oracle.starting_round == 0 {
         return ContractErr::OracleNotEnabled.std_err();
     }
@@ -271,11 +280,14 @@ fn validate_oracle_round<S: Storage>(
     if oracle.ending_round < round_id {
         return Err(StdError::generic_err("No longer allowed oracle"));
     }
-    if oracle.last_reported_round.unwrap() >= round_id {
-        return Err(StdError::generic_err("Cannot report on previous rounds"));
+    if oracle
+        .last_reported_round
+        .map_or(false, |id| id >= round_id)
+    {
+        return ContractErr::ReportingPreviousRound.std_err();
     }
-    let rr_updated_at = rounds_read(storage).load(&rr_id.to_be_bytes())?.updated_at;
-    let unanswered = round_id + 1 == rr_id && rr_updated_at.is_none();
+    let rr = rounds_read(storage).load(&rr_id.to_be_bytes())?;
+    let unanswered = round_id + 1 == rr_id && rr.updated_at.is_none();
     if round_id != rr_id && round_id != rr_id + 1 && !unanswered {
         return Err(StdError::generic_err("Invalid round to report"));
     }
@@ -348,7 +360,6 @@ fn initialize_new_round<S: Storage>(
         })
     })?;
 
-    // TODO: add event
     Ok(())
 }
 
@@ -359,7 +370,7 @@ fn prev_round_id(round_id: u32) -> StdResult<u32> {
 }
 
 fn is_accepting_submissions(details: &RoundDetails) -> bool {
-    details.max_submissions == 0
+    details.max_submissions != 0
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -943,15 +954,9 @@ pub fn get_round_data<S: Storage, A: Api, Q: Querier>(
     }
     Ok(RoundDataResponse {
         round_id,
-        answer: round
-            .answer
-            .ok_or_else(|| StdError::generic_err("'answer' unset"))?,
-        started_at: round
-            .started_at
-            .ok_or_else(|| StdError::generic_err("'started_at' unset"))?,
-        updated_at: round
-            .updated_at
-            .ok_or_else(|| StdError::generic_err("'updated_at' unset"))?,
+        answer: round.answer,
+        started_at: round.started_at,
+        updated_at: round.updated_at,
         answered_in_round: round.answered_in_round,
     })
 }

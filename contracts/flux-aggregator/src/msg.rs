@@ -5,9 +5,11 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
+    /// LINK token address
     pub link: HumanAddr,
     pub payment_amount: Uint128,
     pub timeout: u32,
+    /// Address to external data validation
     pub validator: HumanAddr,
     pub min_submission_value: Uint128, // int256
     pub max_submission_value: Uint128, // int256
@@ -18,16 +20,27 @@ pub struct InitMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
+    /// Invoked by oracles when they have witnessed a need to update
     Submit {
-        round_id: u32,       // uint256
+        /// ID of the round this submission pertains to
+        round_id: u32, // uint256
+        /// The updated data that the oracle is submitting
         submission: Uint128, // int256
     },
+    /// Invoked by the owner to remove and add new oracles as well as
+    /// update the round related parameters that pertain to total oracle count
     ChangeOracles {
+        /// Oracles to be removed
         removed: Vec<HumanAddr>,
+        /// Oracles to be added
         added: Vec<HumanAddr>,
+        /// Admins to be added. Only this address is allowed to access the respective oracle's funds
         added_admins: Vec<HumanAddr>,
+        /// The new minimum submission count for each round
         min_submissions: u32,
+        /// The new maximum submission count for each round
         max_submissions: u32,
+        /// The number of rounds an Oracle has to wait before they can initiate a round
         restart_delay: u32,
     },
     WithdrawPayment {
@@ -46,6 +59,8 @@ pub enum HandleMsg {
     AcceptAdmin {
         oracle: HumanAddr,
     },
+    /// Allows non-oracles to request a new round.
+    /// Response contains the new `round_id` ([`u32`]).
     RequestNewRound {},
     SetRequesterPermissions {
         requester: HumanAddr,
@@ -60,29 +75,44 @@ pub enum HandleMsg {
         timeout: u32,
     },
     UpdateAvailableFunds {},
+    /// Updates the address which does external data validation
     SetValidator {
+        /// Address of the new validation contract
         validator: HumanAddr,
     },
+    /// Handler for LINK token Send message
     Receive(Cw20ReceiveMsg),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
+    /// Get the amount of payment yet to be withdrawn by oracles.
+    /// Response: [`Uint128`].
     GetAllocatedFunds {},
+    /// Get the amount of future funding available to oracles.
+    /// Response: [`Uint128`].
     GetAvailableFunds {},
-    GetWithdrawablePayment {
-        oracle: HumanAddr,
-    },
+    /// Query the available amount of LINK for an oracle to withdraw.
+    /// Response: [`Uint128`].
+    GetWithdrawablePayment { oracle: HumanAddr },
+    /// Response: [`u8`].
     GetOracleCount {},
+    /// Response: [`Vec<HumanAddr>`].
     GetOracles {},
+    /// Response: [`HumanAddr`].
     GetAdmin {
+        /// The address of the oracle whose admin is being queried
         oracle: HumanAddr,
     },
+    /// Response: [`RoundDataResponse`].
     GetRoundData {
+        /// The round ID to retrieve the round data for
         round_id: u32,
     },
+    /// Response: [`RoundDataResponse`].
     GetLatestRoundData {},
+    /// Response: [`OracleRoundStateResponse`].
     GetOracleRoundState {
         oracle: HumanAddr,
         queried_round_id: u32,
@@ -92,11 +122,11 @@ pub enum QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct RoundDataResponse {
-    pub round_id: u32,          // uint80
-    pub answer: Uint128,        // int256
-    pub started_at: u64,        // int256
-    pub updated_at: u64,        // uint256
-    pub answered_in_round: u32, // uint80
+    pub round_id: u32,           // uint80
+    pub answer: Option<Uint128>, // int256
+    pub started_at: Option<u64>, // int256
+    pub updated_at: Option<u64>, // uint256
+    pub answered_in_round: u32,  // uint80
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
