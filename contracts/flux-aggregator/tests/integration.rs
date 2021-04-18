@@ -1,7 +1,7 @@
 mod helpers;
 
 use cosmwasm_std::{
-    from_binary, CosmosMsg, Env, HandleResponse, HumanAddr, InitResponse, StdResult, Uint128,
+    from_binary, log, CosmosMsg, Env, HandleResponse, HumanAddr, InitResponse, StdResult, Uint128,
     WasmMsg,
 };
 use cosmwasm_vm::{
@@ -34,7 +34,7 @@ fn successful_init() {
 #[test]
 fn submit_funds() {
     let oracles = personas![Neil, Ned, Nelly];
-    let (mut deps, _) = init_with_oracles(oracles);
+    let (mut deps, _) = init_with_oracles(oracles.clone(), oracles);
 
     let allocated = q!(deps, GetAllocatedFunds => Uint128);
     assert_eq!(allocated, Uint128::zero());
@@ -58,7 +58,7 @@ fn submit_funds() {
 #[test]
 fn submit_under_min_reported() {
     let oracles = personas![Neil, Ned, Nelly];
-    let (mut deps, _) = init_with_oracles(oracles.clone());
+    let (mut deps, _) = init_with_oracles(oracles.clone(), oracles.clone());
 
     let allocated = q!(deps, GetAllocatedFunds => Uint128);
     assert_eq!(allocated, Uint128::zero());
@@ -70,17 +70,17 @@ fn submit_under_min_reported() {
     let env = mock_env("Neil", &[]);
     let _: HandleResponse = handle(&mut deps, env.clone(), submission.clone()).unwrap();
 
-    let withdrawable = q!(deps,  GetWithdrawablePayment oracle: personas!(Neil) => Uint128);
+    let withdrawable = q!(deps,  GetWithdrawablePayment oracle: persona!(Neil)=> Uint128);
     assert_eq!(withdrawable, PAYMENT_AMOUNT);
 
-    let withdrawable = q!(deps, GetWithdrawablePayment oracle: personas!(Ned) => Uint128);
+    let withdrawable = q!(deps, GetWithdrawablePayment oracle: persona!(Ned)=> Uint128);
     assert_eq!(withdrawable, Uint128::zero());
 
-    let withdrawable = q!(deps, GetWithdrawablePayment oracle: personas!(Nelly) => Uint128);
+    let withdrawable = q!(deps, GetWithdrawablePayment oracle: persona!(Nelly)=> Uint128);
     assert_eq!(withdrawable, Uint128::zero());
 
     // answer should not be updated
-    let (mut deps, _) = init_with_oracles(oracles);
+    let (mut deps, _) = init_with_oracles(oracles.clone(), oracles);
 
     let round = q!(deps, GetLatestRoundData => RoundDataResponse);
     assert!(round.answer.is_none());
@@ -98,7 +98,7 @@ fn submit_under_min_reported() {
 #[test]
 fn submit_complete_round() {
     let oracles = personas![Ned, Nelly];
-    let (mut deps, _) = init_with_oracles(oracles.clone());
+    let (mut deps, _) = init_with_oracles(oracles.clone(), oracles.clone());
 
     let round = q!(deps, GetLatestRoundData => RoundDataResponse);
     assert!(round.answer.is_none());
@@ -136,7 +136,7 @@ fn submit_complete_round() {
 #[test]
 fn submit_twice() {
     let oracles = personas![Ned, Nelly];
-    let (mut deps, _) = init_with_oracles(oracles.clone());
+    let (mut deps, _) = init_with_oracles(oracles.clone(), oracles.clone());
     let env = mock_env("Ned", &[]);
     let submission = HandleMsg::Submit {
         round_id: 1,
@@ -243,7 +243,7 @@ fn remove_oracles() {
 
 #[test]
 fn set_requester_permissions() {
-    let (mut deps, _) = init_with_oracles(vec![personas!(Ned)]);
+    let (mut deps, _) = init_with_oracles(personas!(Ned), personas!(Ned));
 
     let env = mock_env("Ned", &[]);
     let submission = HandleMsg::Submit {
@@ -257,7 +257,7 @@ fn set_requester_permissions() {
 
     let env = mock_env("owner", &[]);
     let msg = HandleMsg::SetRequesterPermissions {
-        requester: personas!(Ned),
+        requester: persona!(Ned),
         authorized: true,
         delay: 0,
     };
@@ -296,6 +296,62 @@ fn set_validator() {
     assert_eq!(res.unwrap_err(), ContractErr::NotOwner.std());
 }
 
+#[test]
+fn transfer_admin() {
+    let oracle = persona!(Oracle);
+    let admin = persona!(Admin);
+    let pending = persona!(Pending);
+    let (mut deps, env) = init_with_oracles(vec![oracle.clone()], vec![admin.clone()]);
+    let msg = HandleMsg::TransferAdmin {
+        oracle: oracle.clone(),
+        new_admin: pending.clone(),
+    };
+
+    // called by non admin
+    let res: StdResult<HandleResponse> = handle(&mut deps, env, &msg);
+    assert_eq!(res.unwrap_err(), ContractErr::NotAdmin.std());
+
+    let env = mock_env("Admin", &[]);
+    let res: HandleResponse = handle(&mut deps, env.clone(), &msg).unwrap();
+    let expected_log = vec![
+        log("action", "transfer admin"),
+        log("oracle", oracle.clone()),
+        log("sender", admin.clone()),
+        log("new_admin", pending.clone()),
+    ];
+    assert_eq!(res.log, expected_log);
+
+    let res = q!(deps, GetAdmin oracle: oracle => HumanAddr);
+    assert_eq!(res, admin);
+}
+
+#[test]
+fn accept_admin() {
+    let oracle = persona!(Oracle);
+    let admin = persona!(Admin);
+    let pending = persona!(Pending);
+    let (mut deps, _) = init_with_oracles(vec![oracle.clone()], vec![admin.clone()]);
+    let msg = HandleMsg::TransferAdmin {
+        oracle: oracle.clone(),
+        new_admin: pending.clone(),
+    };
+    let env = mock_env("Admin", &[]);
+    let _: HandleResponse = handle(&mut deps, env.clone(), &msg).unwrap();
+
+    let msg = HandleMsg::AcceptAdmin {
+        oracle: oracle.clone(),
+    };
+    // called by non pending admin
+    let res: StdResult<HandleResponse> = handle(&mut deps, env, &msg);
+    assert_eq!(res.unwrap_err(), ContractErr::NotPendingAdmin.std());
+
+    let env = mock_env("Pending", &[]);
+    let _: HandleResponse = handle(&mut deps, env.clone(), &msg).unwrap();
+
+    let res = q!(deps, GetAdmin oracle: oracle => HumanAddr);
+    assert_eq!(res, pending);
+}
+
 fn default_init() -> (Instance<MockStorage, MockApi, CustomQuerier>, Env) {
     let link_addr = HumanAddr::from("link");
     let validator_addr = HumanAddr::from("validator");
@@ -323,6 +379,7 @@ fn default_init() -> (Instance<MockStorage, MockApi, CustomQuerier>, Env) {
 
 fn init_with_oracles(
     oracles: Vec<HumanAddr>,
+    admins: Vec<HumanAddr>,
 ) -> (Instance<MockStorage, MockApi, CustomQuerier>, Env) {
     let (mut deps, env) = default_init();
 
@@ -330,8 +387,8 @@ fn init_with_oracles(
 
     let msg = HandleMsg::ChangeOracles {
         removed: vec![],
-        added: oracles.clone(),
-        added_admins: oracles,
+        added: oracles,
+        added_admins: admins,
         min_submissions: min_max,
         max_submissions: min_max,
         restart_delay: RESTART_DELAY,

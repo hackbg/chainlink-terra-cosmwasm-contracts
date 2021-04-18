@@ -66,10 +66,14 @@ pub fn mock_dependencies_with_custom_querier(
 }
 
 #[macro_export]
-macro_rules! personas {
+macro_rules! persona {
     ($name:ident) => {
         HumanAddr::from(stringify!($name))
     };
+}
+
+#[macro_export]
+macro_rules! personas {
     [$($name:ident), *] => {
         vec![$(HumanAddr::from(stringify!($name))), *]
     };

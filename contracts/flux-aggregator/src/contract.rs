@@ -518,7 +518,8 @@ pub fn handle_transfer_admin<S: Storage, A: Api, Q: Querier>(
     Ok(HandleResponse {
         messages: vec![],
         log: vec![
-            log("oracle_admin_update_requested", oracle),
+            log("action", "transfer admin"),
+            log("oracle", oracle),
             log("sender", env.message.sender),
             log("new_admin", new_admin),
         ],
