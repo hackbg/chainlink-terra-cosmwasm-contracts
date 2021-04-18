@@ -3,7 +3,7 @@ use cosmwasm_std::{
     LogAttribute, Querier, StdError, StdResult, Storage,
 };
 
-use crate::msg::{HandleMsg, InitMsg, OwnerResponse, QueryMsg};
+use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::state::{owner, owner_read, State};
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
@@ -78,7 +78,7 @@ fn transfer_ownership<S: Storage, A: Api, Q: Querier>(
     ])
 }
 
-fn handle_accept_ownership<S: Storage, A: Api, Q: Querier>(
+pub fn handle_accept_ownership<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
 ) -> StdResult<HandleResponse> {
@@ -118,13 +118,9 @@ fn accept_ownership<S: Storage, A: Api, Q: Querier>(
 }
 
 pub fn get_owner<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<Binary> {
-    let state = owner_read(&deps.storage).load()?;
+    let owner = owner_read(&deps.storage).load()?.owner;
 
-    let resp = OwnerResponse {
-        owner: state.owner,
-        pending_owner: state.pending_owner,
-    };
-    to_binary(&resp)
+    to_binary(&owner)
 }
 
 #[cfg(test)]
@@ -147,8 +143,8 @@ mod tests {
 
         // it worked, let's query the state
         let res = query(&deps, QueryMsg::GetOwner {}).unwrap();
-        let value: OwnerResponse = from_binary(&res).unwrap();
-        assert_eq!(true, CanonicalAddr::eq(&sender, &value.owner));
+        let owner = from_binary(&res).unwrap();
+        assert_eq!(true, CanonicalAddr::eq(&sender, &owner));
     }
 
     #[test]
@@ -173,12 +169,13 @@ mod tests {
         let res = handle(&mut deps, env, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let res = query(&deps, QueryMsg::GetOwner {}).unwrap();
-        let value: OwnerResponse = from_binary(&res).unwrap();
-        assert_eq!(
-            true,
-            CanonicalAddr::eq(&mock_addr, &value.pending_owner.unwrap())
-        );
+        let _res = query(&deps, QueryMsg::GetOwner {}).unwrap();
+        let new_pending_owner = owner_read(&deps.storage)
+            .load()
+            .unwrap()
+            .pending_owner
+            .unwrap();
+        assert_eq!(true, CanonicalAddr::eq(&mock_addr, &new_pending_owner));
     }
 
     #[test]
@@ -203,11 +200,11 @@ mod tests {
         let res = handle(&mut deps, env.clone(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let res = query(&deps, QueryMsg::GetOwner {}).unwrap();
-        let value: OwnerResponse = from_binary(&res).unwrap();
+        let _res = query(&deps, QueryMsg::GetOwner {}).unwrap();
+        let new_pending_owner = owner_read(&deps.storage).load().unwrap().pending_owner;
         assert_eq!(
             true,
-            CanonicalAddr::eq(&mock_addr, &value.pending_owner.unwrap())
+            CanonicalAddr::eq(&mock_addr, &new_pending_owner.clone().unwrap())
         );
 
         let env = mock_env(MOCK_CONTRACT_ADDR, &coins(1000, "earth"));
@@ -215,9 +212,12 @@ mod tests {
         let res = handle(&mut deps, env.clone(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let res = query(&deps, QueryMsg::GetOwner {}).unwrap();
-        let value: OwnerResponse = from_binary(&res).unwrap();
-        assert_eq!(true, CanonicalAddr::eq(&mock_addr, &value.owner));
-        assert_eq!(true, value.pending_owner.is_none());
+        let _res = query(&deps, QueryMsg::GetOwner {}).unwrap();
+        assert_eq!(
+            true,
+            CanonicalAddr::eq(&mock_addr, &new_pending_owner.clone().unwrap())
+        );
+        let new_pending_owner = owner_read(&deps.storage).load().unwrap().pending_owner;
+        assert_eq!(true, new_pending_owner.is_none());
     }
 }
