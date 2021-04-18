@@ -573,8 +573,8 @@ pub fn handle_request_new_round<S: Storage, A: Api, Q: Querier>(
     }
     let current_round_id = reporting_round_id_read(&deps.storage).load()?;
     let current_round = rounds_read(&deps.storage).load(&current_round_id.to_be_bytes())?;
-    if current_round.updated_at.is_some()
-        && timed_out(&deps.storage, current_round_id, env.block.time)?
+    if current_round.updated_at.is_none()
+        && !timed_out(&deps.storage, current_round_id, env.block.time)?
     {
         return ContractErr::NotSupersedable.std_err();
     }

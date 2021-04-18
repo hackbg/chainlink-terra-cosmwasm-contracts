@@ -34,7 +34,7 @@ fn successful_init() {
 #[test]
 fn submit_funds() {
     let oracles = personas![Neil, Ned, Nelly];
-    let (mut deps, _) = init_with_oracles(oracles.clone(), oracles);
+    let (mut deps, _) = init_with_oracles(oracles.clone(), oracles, 3);
 
     let allocated = q!(deps, GetAllocatedFunds => Uint128);
     assert_eq!(allocated, Uint128::zero());
@@ -58,7 +58,7 @@ fn submit_funds() {
 #[test]
 fn submit_under_min_reported() {
     let oracles = personas![Neil, Ned, Nelly];
-    let (mut deps, _) = init_with_oracles(oracles.clone(), oracles.clone());
+    let (mut deps, _) = init_with_oracles(oracles.clone(), oracles.clone(), 3);
 
     let allocated = q!(deps, GetAllocatedFunds => Uint128);
     assert_eq!(allocated, Uint128::zero());
@@ -80,7 +80,7 @@ fn submit_under_min_reported() {
     assert_eq!(withdrawable, Uint128::zero());
 
     // answer should not be updated
-    let (mut deps, _) = init_with_oracles(oracles.clone(), oracles);
+    let (mut deps, _) = init_with_oracles(oracles.clone(), oracles, 3);
 
     let round = q!(deps, GetLatestRoundData => RoundDataResponse);
     assert!(round.answer.is_none());
@@ -98,7 +98,7 @@ fn submit_under_min_reported() {
 #[test]
 fn submit_complete_round() {
     let oracles = personas![Ned, Nelly];
-    let (mut deps, _) = init_with_oracles(oracles.clone(), oracles.clone());
+    let (mut deps, _) = init_with_oracles(oracles.clone(), oracles.clone(), 2);
 
     let round = q!(deps, GetLatestRoundData => RoundDataResponse);
     assert!(round.answer.is_none());
@@ -136,7 +136,7 @@ fn submit_complete_round() {
 #[test]
 fn submit_twice() {
     let oracles = personas![Ned, Nelly];
-    let (mut deps, _) = init_with_oracles(oracles.clone(), oracles.clone());
+    let (mut deps, _) = init_with_oracles(oracles.clone(), oracles.clone(), 2);
     let env = mock_env("Ned", &[]);
     let submission = HandleMsg::Submit {
         round_id: 1,
@@ -243,7 +243,7 @@ fn remove_oracles() {
 
 #[test]
 fn set_requester_permissions() {
-    let (mut deps, _) = init_with_oracles(personas!(Ned), personas!(Ned));
+    let (mut deps, _) = init_with_oracles(personas!(Ned), personas!(Ned), 1);
 
     let env = mock_env("Ned", &[]);
     let submission = HandleMsg::Submit {
@@ -301,7 +301,7 @@ fn transfer_admin() {
     let oracle = persona!(Oracle);
     let admin = persona!(Admin);
     let pending = persona!(Pending);
-    let (mut deps, env) = init_with_oracles(vec![oracle.clone()], vec![admin.clone()]);
+    let (mut deps, env) = init_with_oracles(vec![oracle.clone()], vec![admin.clone()], 1);
     let msg = HandleMsg::TransferAdmin {
         oracle: oracle.clone(),
         new_admin: pending.clone(),
@@ -330,7 +330,7 @@ fn accept_admin() {
     let oracle = persona!(Oracle);
     let admin = persona!(Admin);
     let pending = persona!(Pending);
-    let (mut deps, _) = init_with_oracles(vec![oracle.clone()], vec![admin.clone()]);
+    let (mut deps, _) = init_with_oracles(vec![oracle.clone()], vec![admin.clone()], 1);
     let msg = HandleMsg::TransferAdmin {
         oracle: oracle.clone(),
         new_admin: pending.clone(),
@@ -350,6 +350,114 @@ fn accept_admin() {
 
     let res = q!(deps, GetAdmin oracle: oracle => HumanAddr);
     assert_eq!(res, pending);
+}
+
+#[test]
+fn request_new_round() {
+    let (mut deps, _) = init_with_oracles(personas!(Ned), personas!(Ned), 1);
+
+    let env = mock_env("Ned", &[]);
+    let submission = HandleMsg::Submit {
+        round_id: 1,
+        submission: ANSWER,
+    };
+    let _: HandleResponse = handle(&mut deps, env.clone(), &submission).unwrap();
+
+    let env = mock_env("owner", &[]);
+    let msg = HandleMsg::SetRequesterPermissions {
+        requester: persona!(Ned),
+        authorized: true,
+        delay: 0,
+    };
+    let _: HandleResponse = handle(&mut deps, env.clone(), &msg).unwrap();
+
+    let env = mock_env("Ned", &[]);
+    let res: HandleResponse = handle(&mut deps, env, HandleMsg::RequestNewRound {}).unwrap();
+    let round_id: u32 = from_binary(&res.data.unwrap()).unwrap();
+    assert_eq!(round_id, 2);
+}
+
+#[test]
+fn request_new_round_with_restart_delay() {
+    let start_round = 1;
+
+    let (mut deps, _) =
+        init_with_oracles(personas!(Ned, Carol, Eddy), personas!(Ned, Carol, Eddy), 1);
+
+    let env = mock_env("Ned", &[]);
+    let submission = HandleMsg::Submit {
+        round_id: start_round,
+        submission: ANSWER,
+    };
+    let _: HandleResponse = handle(&mut deps, env.clone(), &submission).unwrap();
+
+    let env = mock_env("owner", &[]);
+    let msg = HandleMsg::SetRequesterPermissions {
+        requester: persona!(Eddy),
+        authorized: true,
+        delay: 1,
+    };
+    let _: HandleResponse = handle(&mut deps, env.clone(), &msg).unwrap();
+    let msg = HandleMsg::SetRequesterPermissions {
+        requester: persona!(Carol),
+        authorized: true,
+        delay: 0,
+    };
+    let _: HandleResponse = handle(&mut deps, env.clone(), &msg).unwrap();
+
+    let env = mock_env("Eddy", &[]);
+    let _: HandleResponse = handle(&mut deps, env.clone(), HandleMsg::RequestNewRound {}).unwrap();
+
+    let env = mock_env("Ned", &[]);
+    let submission = HandleMsg::Submit {
+        round_id: start_round + 1,
+        submission: ANSWER,
+    };
+    let _: HandleResponse = handle(&mut deps, env.clone(), &submission).unwrap();
+    // delay still remaining
+    let env = mock_env("Eddy", &[]);
+    let res: StdResult<HandleResponse> = handle(&mut deps, env, HandleMsg::RequestNewRound {});
+    assert_eq!(res.unwrap_err(), ContractErr::DelayNotRespected.std());
+
+    // advance round
+    let env = mock_env("Carol", &[]);
+    let _: HandleResponse = handle(&mut deps, env.clone(), HandleMsg::RequestNewRound {}).unwrap();
+    let env = mock_env("Ned", &[]);
+    let submission = HandleMsg::Submit {
+        round_id: start_round + 2,
+        submission: ANSWER,
+    };
+    let _: HandleResponse = handle(&mut deps, env, &submission).unwrap();
+
+    // try again
+    let env = mock_env("Eddy", &[]);
+    let _: HandleResponse = handle(&mut deps, env.clone(), HandleMsg::RequestNewRound {}).unwrap();
+}
+
+#[test]
+fn request_new_round_round_in_progress() {
+    let (mut deps, _) = init_with_oracles(personas!(Ned, Carol), personas!(Ned, Carol), 2);
+
+    let env = mock_env("Ned", &[]);
+    let submission = HandleMsg::Submit {
+        round_id: 1,
+        submission: ANSWER,
+    };
+    let _: HandleResponse = handle(&mut deps, env.clone(), &submission).unwrap();
+    let res = q!(deps, GetLatestRoundData => RoundDataResponse);
+    assert!(res.answer.is_none());
+
+    let env = mock_env("owner", &[]);
+    let msg = HandleMsg::SetRequesterPermissions {
+        requester: persona!(Ned),
+        authorized: true,
+        delay: 0,
+    };
+    let _: HandleResponse = handle(&mut deps, env.clone(), &msg).unwrap();
+
+    let env = mock_env("Ned", &[]);
+    let res: StdResult<HandleResponse> = handle(&mut deps, env, HandleMsg::RequestNewRound {});
+    assert_eq!(res.unwrap_err(), ContractErr::NotSupersedable.std());
 }
 
 fn default_init() -> (Instance<MockStorage, MockApi, CustomQuerier>, Env) {
@@ -380,17 +488,18 @@ fn default_init() -> (Instance<MockStorage, MockApi, CustomQuerier>, Env) {
 fn init_with_oracles(
     oracles: Vec<HumanAddr>,
     admins: Vec<HumanAddr>,
+    min: u32,
 ) -> (Instance<MockStorage, MockApi, CustomQuerier>, Env) {
     let (mut deps, env) = default_init();
 
-    let min_max = oracles.len() as u32;
+    let max = oracles.len() as u32;
 
     let msg = HandleMsg::ChangeOracles {
         removed: vec![],
         added: oracles,
         added_admins: admins,
-        min_submissions: min_max,
-        max_submissions: min_max,
+        min_submissions: min,
+        max_submissions: max,
         restart_delay: RESTART_DELAY,
     };
     let res: HandleResponse = handle(&mut deps, env.clone(), msg).unwrap();
