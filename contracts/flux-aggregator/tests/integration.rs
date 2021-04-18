@@ -11,7 +11,7 @@ use cosmwasm_vm::{
 
 use flux_aggregator::{
     error::ContractErr,
-    msg::{HandleMsg, InitMsg, QueryMsg, RoundDataResponse},
+    msg::{ConfigResponse, HandleMsg, InitMsg, QueryMsg, RoundDataResponse},
 };
 use helpers::{mock_dependencies_with_custom_querier, CustomQuerier};
 
@@ -274,6 +274,28 @@ fn set_requester_permissions() {
     let _: HandleResponse = handle(&mut deps, env, &msg).unwrap();
 }
 
+#[test]
+fn set_validator() {
+    let (mut deps, env) = default_init();
+
+    let new_validator = HumanAddr::from("new_validator");
+    let msg = HandleMsg::SetValidator {
+        validator: new_validator.clone(),
+    };
+    let res: HandleResponse = handle(&mut deps, env.clone(), &msg).unwrap();
+    // successful change should return logs
+    assert!(res.log.len() == 3);
+    let validator = q!(deps, GetAggregatorConfig => ConfigResponse).validator;
+    assert_eq!(validator, new_validator);
+    // setting the same validator twice should not logs
+    let res: HandleResponse = handle(&mut deps, env, &msg).unwrap();
+    assert!(res.log.is_empty());
+    // should only be usable by owner
+    let env = mock_env("Ned", &[]);
+    let res: StdResult<HandleResponse> = handle(&mut deps, env, &msg);
+    assert_eq!(res.unwrap_err(), ContractErr::NotOwner.std());
+}
+
 fn default_init() -> (Instance<MockStorage, MockApi, CustomQuerier>, Env) {
     let link_addr = HumanAddr::from("link");
     let validator_addr = HumanAddr::from("validator");
@@ -288,7 +310,6 @@ fn default_init() -> (Instance<MockStorage, MockApi, CustomQuerier>, Env) {
         description: "LINK/USD".to_string(),
     };
 
-    // stub gives us defaults. Consume it and override...
     let custom = mock_dependencies_with_custom_querier(DEPOSIT.u128());
     let mut deps = Instance::from_code(WASM, custom, 10000000).unwrap();
     let env = mock_env("owner", &[]);

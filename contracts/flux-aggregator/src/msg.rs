@@ -43,30 +43,44 @@ pub enum HandleMsg {
         /// The number of rounds an Oracle has to wait before they can initiate a round
         restart_delay: u32,
     },
+    /// Transfer LINK from oracle to another address. Callable only by oracle's admin
     WithdrawPayment {
+        /// Oracle whose LINK is to be transferred
         oracle: HumanAddr,
+        /// Transfer recipient
         recipient: HumanAddr,
+        /// Amount of LINK to be send
         amount: Uint128, // uint256
     },
+    /// Transfers the contract owner's LINK to another address
     WithdrawFunds {
+        /// Recipient address
         recipient: HumanAddr,
+        /// LINK to be sent
         amount: Uint128, // uint256
     },
+    /// Transfer admin address for an oracle
     TransferAdmin {
+        /// The oracle adddress whose admin is being transferred
         oracle: HumanAddr,
+        /// New admin address
         new_admin: HumanAddr,
     },
+    /// Accept the pending admin transfer for an oracle
     AcceptAdmin {
+        /// Address of the oracle whose admin is being transfered
         oracle: HumanAddr,
     },
     /// Allows non-oracles to request a new round.
     /// Response contains the new `round_id` ([`u32`]).
     RequestNewRound {},
+    /// Allows/disallows non-oracles to start new rounds. Callable only by contract owner
     SetRequesterPermissions {
         requester: HumanAddr,
         authorized: bool,
         delay: u32,
     },
+    /// Update the round and payment related parameters for subsequent rounds
     UpdateFutureRounds {
         payment_amount: Uint128,
         min_submissions: u32,
@@ -74,6 +88,7 @@ pub enum HandleMsg {
         restart_delay: u32,
         timeout: u32,
     },
+    /// Recalculate available LINK for payouts
     UpdateAvailableFunds {},
     /// Updates the address which does external data validation
     SetValidator {
@@ -87,6 +102,9 @@ pub enum HandleMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
+    /// Returns the settings of the flux aggregator
+    /// Response: [`ConfigResponse`]
+    GetAggregatorConfig {},
     /// Get the amount of payment yet to be withdrawn by oracles.
     /// Response: [`Uint128`].
     GetAllocatedFunds {},
@@ -118,6 +136,21 @@ pub enum QueryMsg {
         queried_round_id: u32,
         timestamp: u64,
     },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct ConfigResponse {
+    pub link: HumanAddr,
+    pub validator: HumanAddr,
+    pub payment_amount: Uint128,
+    pub max_submission_count: u32,
+    pub min_submission_count: u32,
+    pub restart_delay: u32,
+    pub timeout: u32,
+    pub decimals: u8,
+    pub description: String,
+    pub min_submission_value: Uint128,
+    pub max_submission_value: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

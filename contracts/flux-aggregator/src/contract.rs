@@ -880,6 +880,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
+        QueryMsg::GetAggregatorConfig {} => to_binary(&get_aggregator_config(deps)),
         QueryMsg::GetAllocatedFunds {} => to_binary(&get_allocated_funds(deps)),
         QueryMsg::GetAvailableFunds {} => to_binary(&get_available_funds(deps)),
         QueryMsg::GetWithdrawablePayment { oracle } => {
@@ -901,6 +902,25 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
             timestamp,
         )),
     }
+}
+
+pub fn get_aggregator_config<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<ConfigResponse> {
+    let config = config_read(&deps.storage).load()?;
+    Ok(ConfigResponse {
+        link: deps.api.human_address(&config.link)?,
+        validator: deps.api.human_address(&config.validator)?,
+        payment_amount: config.payment_amount,
+        max_submission_count: config.min_submission_count,
+        min_submission_count: config.max_submission_count,
+        restart_delay: config.restart_delay,
+        timeout: config.timeout,
+        decimals: config.decimals,
+        description: config.description,
+        min_submission_value: config.min_submission_value,
+        max_submission_value: config.max_submission_value,
+    })
 }
 
 pub fn get_allocated_funds<S: Storage, A: Api, Q: Querier>(
