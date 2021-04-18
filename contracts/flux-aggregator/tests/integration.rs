@@ -241,6 +241,39 @@ fn remove_oracles() {
     assert_eq!(vec![oracle], remaining_oracles);
 }
 
+#[test]
+fn set_requester_permissions() {
+    let (mut deps, _) = init_with_oracles(vec![personas!(Ned)]);
+
+    let env = mock_env("Ned", &[]);
+    let submission = HandleMsg::Submit {
+        round_id: 1,
+        submission: ANSWER,
+    };
+    let _: HandleResponse = handle(&mut deps, env.clone(), &submission).unwrap();
+    // attempt without permissions
+    let res: StdResult<HandleResponse> = handle(&mut deps, env, HandleMsg::RequestNewRound {});
+    assert_eq!(res.unwrap_err(), ContractErr::Unauthorized.std());
+
+    let env = mock_env("owner", &[]);
+    let msg = HandleMsg::SetRequesterPermissions {
+        requester: personas!(Ned),
+        authorized: true,
+        delay: 0,
+    };
+    let _: HandleResponse = handle(&mut deps, env, &msg).unwrap();
+    // attempt with permissions
+    let env = mock_env("Ned", &[]);
+    let res: HandleResponse = handle(&mut deps, env, HandleMsg::RequestNewRound {}).unwrap();
+    let round_id: u32 = from_binary(&res.data.unwrap()).unwrap();
+    assert_eq!(round_id, 2);
+
+    // set the same permission twice
+    // should not panic
+    let env = mock_env("owner", &[]);
+    let _: HandleResponse = handle(&mut deps, env, &msg).unwrap();
+}
+
 fn default_init() -> (Instance<MockStorage, MockApi, CustomQuerier>, Env) {
     let link_addr = HumanAddr::from("link");
     let validator_addr = HumanAddr::from("validator");
@@ -258,7 +291,7 @@ fn default_init() -> (Instance<MockStorage, MockApi, CustomQuerier>, Env) {
     // stub gives us defaults. Consume it and override...
     let custom = mock_dependencies_with_custom_querier(DEPOSIT.u128());
     let mut deps = Instance::from_code(WASM, custom, 10000000).unwrap();
-    let env = mock_env("aggregator", &[]);
+    let env = mock_env("owner", &[]);
     let _: InitResponse = init(&mut deps, env.clone(), msg).unwrap();
 
     let _: HandleResponse =

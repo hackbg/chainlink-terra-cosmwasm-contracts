@@ -306,12 +306,13 @@ fn timed_out<S: Storage>(storage: &S, round_id: u32, timestamp: u64) -> StdResul
     let started_at = rounds_read(storage)
         .load(&round_id.to_be_bytes())?
         .started_at;
-    let round_timeout = details_read(storage).load(&round_id.to_be_bytes())?.timeout as u64;
-    Ok(
-        started_at.is_some()
-            && round_timeout > 0
-            && started_at.unwrap() + round_timeout < timestamp,
-    )
+    let round_details = details_read(storage).may_load(&round_id.to_be_bytes())?;
+    if let Some(round_details) = round_details {
+        let timeout = round_details.timeout as u64;
+        Ok(started_at.is_some() && timeout > 0 && started_at.unwrap() + timeout < timestamp)
+    } else {
+        Ok(false)
+    }
 }
 
 fn initialize_new_round<S: Storage>(
@@ -563,9 +564,11 @@ pub fn handle_request_new_round<S: Storage, A: Api, Q: Querier>(
     env: Env,
 ) -> StdResult<HandleResponse> {
     let sender_addr = deps.api.canonical_address(&env.message.sender)?;
-    let requester = requesters_read(&deps.storage).load(sender_addr.as_slice())?;
+    let requester = requesters_read(&deps.storage)
+        .may_load(sender_addr.as_slice())?
+        .ok_or_else(|| ContractErr::Unauthorized.std())?;
     if !requester.authorized {
-        return Err(StdError::generic_err("Unauthorized requester"));
+        return ContractErr::Unauthorized.std_err();
     }
     let current_round_id = reporting_round_id_read(&deps.storage).load()?;
     let current_round = rounds_read(&deps.storage).load(&current_round_id.to_be_bytes())?;
@@ -592,7 +595,7 @@ pub fn handle_request_new_round<S: Storage, A: Api, Q: Querier>(
         },
     )?;
 
-    let round_id_serialized = to_binary(&new_round_id)?; // TODO: maybe wrap in object
+    let round_id_serialized = to_binary(&new_round_id)?;
     Ok(HandleResponse {
         messages: vec![],
         log: vec![],
@@ -729,7 +732,9 @@ pub fn handle_set_requester_permissions<S: Storage, A: Api, Q: Querier>(
 
     let requester_addr = deps.api.canonical_address(&requester)?;
     let requester_key = requester_addr.as_slice();
-    let curr_requester = requesters_read(&deps.storage).load(requester_key)?;
+    let curr_requester = requesters_read(&deps.storage)
+        .may_load(requester_key)?
+        .unwrap_or_default();
 
     if curr_requester.authorized == authorized {
         return Ok(HandleResponse::default());
