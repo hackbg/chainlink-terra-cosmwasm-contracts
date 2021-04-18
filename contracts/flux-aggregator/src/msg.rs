@@ -7,13 +7,22 @@ use serde::{Deserialize, Serialize};
 pub struct InitMsg {
     /// LINK token address
     pub link: HumanAddr,
+    /// Amount of LINK paid to each oracle per submission
     pub payment_amount: Uint128,
+    /// The number of seconds after the previous round that are
+    /// allowed to lapse before allowing an oracle to skip an unfinished round
     pub timeout: u32,
     /// Address to external data validation
     pub validator: HumanAddr,
+    /// An immutable check for a lower bound of what
+    /// submission values are accepted from an oracle
     pub min_submission_value: Uint128, // int256
+    /// An immutable check for an upper bound of what
+    /// submission values are accepted from an oracle
     pub max_submission_value: Uint128, // int256
+    /// The number of decimals to offset the answer by
     pub decimals: u8,
+    /// A short description of what is being reported
     pub description: String,
 }
 
@@ -76,16 +85,24 @@ pub enum HandleMsg {
     RequestNewRound {},
     /// Allows/disallows non-oracles to start new rounds. Callable only by contract owner
     SetRequesterPermissions {
+        /// Address to set permission for
         requester: HumanAddr,
+        /// Is requester authorized
         authorized: bool,
+        /// The number of rounds the requester must wait before starting another round
         delay: u32,
     },
     /// Update the round and payment related parameters for subsequent rounds
     UpdateFutureRounds {
+        /// Payment amount for subsequent rounds
         payment_amount: Uint128,
+        /// The new minimum submission count for each round
         min_submissions: u32,
+        /// The new maximum submission count for each round
         max_submissions: u32,
+        /// The number of rounds an Oracle has to wait before they can initiate a round
         restart_delay: u32,
+        /// The new timeout to be used for future rounds
         timeout: u32,
     },
     /// Recalculate available LINK for payouts
@@ -113,26 +130,37 @@ pub enum QueryMsg {
     GetAvailableFunds {},
     /// Query the available amount of LINK for an oracle to withdraw.
     /// Response: [`Uint128`].
-    GetWithdrawablePayment { oracle: HumanAddr },
+    GetWithdrawablePayment {
+        /// Address of the Oracle which is query for
+        oracle: HumanAddr,
+    },
+    /// Query the number of oracles
     /// Response: [`u8`].
     GetOracleCount {},
+    /// Query for the addresses of the oracles on the contract
     /// Response: [`Vec<HumanAddr>`].
     GetOracles {},
+    /// Get the admin address of a specific Oracle
     /// Response: [`HumanAddr`].
     GetAdmin {
         /// The address of the oracle whose admin is being queried
         oracle: HumanAddr,
     },
+    /// Query data for a specific round
     /// Response: [`RoundDataResponse`].
     GetRoundData {
         /// The round ID to retrieve the round data for
         round_id: u32,
     },
+    /// Query data for the latest round
     /// Response: [`RoundDataResponse`].
     GetLatestRoundData {},
+    /// Unimplemented
     /// Response: [`OracleRoundStateResponse`].
     GetOracleRoundState {
+        /// Oracle address to look up for
         oracle: HumanAddr,
+        /// Round for which to look up
         queried_round_id: u32,
         timestamp: u64,
     },
