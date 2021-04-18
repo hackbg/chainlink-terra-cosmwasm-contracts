@@ -71,6 +71,10 @@ pub enum ContractErr {
     #[error("Oracle not yet enabled")]
     OracleNotYetEnabled,
 
+    /// Oracle no longer allowed
+    #[error("Oracle no longer allowed")]
+    NoLongerAllowed,
+
     /// Insufficient funds for payment
     #[error("Insufficient funds for payment")]
     InsufficientFunds,
@@ -87,13 +91,29 @@ pub enum ContractErr {
     #[error("Delay cannot exceed total")]
     DelayGreaterThanTotal,
 
+    /// Delay restriction not respected
+    #[error("Delay restriction not respected")]
+    DelayNotRespected,
+
     /// Cannot report on previous rounds
     #[error("Cannot report on previous rounds")]
     ReportingPreviousRound,
 
+    /// Previous round not supersedable
+    #[error("Previous round not supersedable")]
+    NotSupersedable,
+
+    /// Invalid round to report
+    #[error("Invalid round to report")]
+    InvalidRound,
+
     /// Round not accepting submissions
     #[error("Round not accepting submissions")]
     NotAcceptingSubmissions,
+
+    /// NoSubmissions
+    #[error("NoSubmissions")]
+    NoSubmissions,
 
     /// Receive does not expect payload
     #[error("Receive does not expect payload")]

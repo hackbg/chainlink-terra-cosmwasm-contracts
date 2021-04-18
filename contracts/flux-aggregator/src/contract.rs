@@ -217,8 +217,8 @@ pub fn handle_submit<S: Storage, A: Api, Q: Querier>(
             .iter()
             .map(|submission| submission.u128())
             .collect::<Vec<u128>>();
-        let new_answer = calculate_median(&mut submissions)
-            .map_err(|_| StdError::generic_err("No submissions"))?;
+        let new_answer =
+            calculate_median(&mut submissions).map_err(|_| ContractErr::NoSubmissions.std())?;
         rounds(&mut deps.storage).save(
             round_key,
             &Round {
@@ -278,7 +278,7 @@ fn validate_oracle_round<S: Storage>(
         return ContractErr::OracleNotYetEnabled.std_err();
     }
     if oracle.ending_round < round_id {
-        return Err(StdError::generic_err("No longer allowed oracle"));
+        return ContractErr::NoLongerAllowed.std_err();
     }
     if oracle
         .last_reported_round
@@ -289,10 +289,10 @@ fn validate_oracle_round<S: Storage>(
     let rr = rounds_read(storage).load(&rr_id.to_be_bytes())?;
     let unanswered = round_id + 1 == rr_id && rr.updated_at.is_none();
     if round_id != rr_id && round_id != rr_id + 1 && !unanswered {
-        return Err(StdError::generic_err("Invalid round to report"));
+        return ContractErr::InvalidRound.std_err();
     }
     if round_id != 1 && !is_supersedable(storage, prev_round_id(round_id)?, timestamp)? {
-        return Err(StdError::generic_err("Previous round not supersedable"));
+        return ContractErr::NotSupersedable.std_err();
     }
     Ok(())
 }
@@ -576,14 +576,14 @@ pub fn handle_request_new_round<S: Storage, A: Api, Q: Querier>(
     if current_round.updated_at.is_some()
         && timed_out(&deps.storage, current_round_id, env.block.time)?
     {
-        return Err(StdError::generic_err("Previous round not supersedable"));
+        return ContractErr::NotSupersedable.std_err();
     }
 
     let new_round_id = current_round_id + 1;
     if new_round_id <= requester.last_started_round + requester.delay
         && requester.last_started_round != 0
     {
-        return Err(StdError::generic_err("Delay not respected"));
+        return ContractErr::DelayNotRespected.std_err();
     }
 
     initialize_new_round(&mut deps.storage, new_round_id, env.block.time)?;
