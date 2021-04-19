@@ -565,6 +565,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "owned"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cosmwasm-vm",
+ "schemars",
+ "serde",
+ "snafu",
+]
+
+[[package]]
 name = "owning_ref"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
