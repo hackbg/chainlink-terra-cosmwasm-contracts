@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, InitResponse,
-    LogAttribute, Querier, StdError, StdResult, Storage,
+    log, to_binary, Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr,
+    InitResponse, LogAttribute, Querier, StdError, StdResult, Storage,
 };
 
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
@@ -37,7 +37,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetOwner {} => get_owner(deps),
+        QueryMsg::GetOwner {} => to_binary(&get_owner(deps)),
     }
 }
 
@@ -117,10 +117,10 @@ fn accept_ownership<S: Storage, A: Api, Q: Querier>(
     ])
 }
 
-pub fn get_owner<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<Binary> {
+pub fn get_owner<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<HumanAddr> {
     let owner = owner_read(&deps.storage).load()?.owner;
 
-    to_binary(&owner)
+    deps.api.human_address(&owner)
 }
 
 #[cfg(test)]
@@ -136,15 +136,15 @@ mod tests {
         let msg = InitMsg {};
         let env = mock_env("creator", &coins(1000, "earth"));
 
-        let sender = deps.api.canonical_address(&env.message.sender).unwrap();
+        let sender = env.clone().message.sender;
         // we can just call .unwrap() to assert this was a success
         let res = init(&mut deps, env, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
         let res = query(&deps, QueryMsg::GetOwner {}).unwrap();
-        let owner = from_binary(&res).unwrap();
-        assert_eq!(true, CanonicalAddr::eq(&sender, &owner));
+        let owner: StdResult<HumanAddr> = from_binary(&res).unwrap();
+        assert_eq!(true, HumanAddr::eq(&sender, &owner.unwrap()));
     }
 
     #[test]
