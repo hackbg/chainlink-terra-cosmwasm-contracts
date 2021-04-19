@@ -3,12 +3,22 @@
   "title": "InitMsg",
   "type": "object",
   "required": [
-    "count"
+    "flagging_threshold",
+    "flags"
   ],
   "properties": {
-    "count": {
+    "flagging_threshold": {
       "type": "integer",
-      "format": "int32"
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "flags": {
+      "$ref": "#/definitions/HumanAddr"
+    }
+  },
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
     }
   }
 }

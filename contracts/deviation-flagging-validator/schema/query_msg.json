@@ -5,10 +5,21 @@
     {
       "type": "object",
       "required": [
-        "get_count"
+        "validate"
       ],
       "properties": {
-        "get_count": {
+        "validate": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "is_valid"
+      ],
+      "properties": {
+        "is_valid": {
           "type": "object"
         }
       }

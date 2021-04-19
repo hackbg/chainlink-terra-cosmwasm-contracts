@@ -3,15 +3,16 @@
   "title": "State",
   "type": "object",
   "required": [
-    "count",
-    "owner"
+    "flagging_treshold",
+    "flags"
   ],
   "properties": {
-    "count": {
+    "flagging_treshold": {
       "type": "integer",
-      "format": "int32"
+      "format": "uint32",
+      "minimum": 0.0
     },
-    "owner": {
+    "flags": {
       "$ref": "#/definitions/CanonicalAddr"
     }
   },
