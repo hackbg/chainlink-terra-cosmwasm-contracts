@@ -33,7 +33,7 @@ pub struct State {
 }
 
 impl State {
-    #[allow(clippy::clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         owner: CanonicalAddr,
         link: CanonicalAddr,
