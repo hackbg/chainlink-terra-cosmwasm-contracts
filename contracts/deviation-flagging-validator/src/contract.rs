@@ -8,6 +8,7 @@ use crate::state::{flags, flags_read, State};
 
 static THRESHOLD_MULTIPLIER: u32 = 100000;
 
+// TODO should probably use type-safe wrappers
 pub enum FlagInterface {
     GetFlag(CanonicalAddr),
     GetFlags(Vec<CanonicalAddr>),
