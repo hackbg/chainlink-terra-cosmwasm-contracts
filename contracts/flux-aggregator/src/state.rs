@@ -7,7 +7,6 @@ use cosmwasm_storage::{
     Singleton,
 };
 
-pub static OWNER_KEY: &[u8] = b"owner";
 pub static CONFIG_KEY: &[u8] = b"config";
 pub static PREFIX_ORACLES: &[u8] = b"oracles";
 pub static ORACLE_ADDRESSES_KEY: &[u8] = b"oracle_addr";
@@ -17,14 +16,6 @@ pub static PREFIX_ROUND: &[u8] = b"round";
 pub static PREFIX_DETAILS: &[u8] = b"details";
 pub static LATEST_ROUND_ID_KEY: &[u8] = b"latest_round_id";
 pub static REPORTING_ROUND_ID_KEY: &[u8] = b"reporting_round_id";
-
-pub fn owner<S: Storage>(storage: &mut S) -> Singleton<S, CanonicalAddr> {
-    singleton(storage, OWNER_KEY)
-}
-
-pub fn owner_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, CanonicalAddr> {
-    singleton_read(storage, OWNER_KEY)
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {

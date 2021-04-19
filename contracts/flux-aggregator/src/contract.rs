@@ -4,6 +4,7 @@ use cosmwasm_std::{
 };
 use cw20::{BalanceResponse, Cw20ReceiveMsg};
 use link_token::msg::{HandleMsg as LinkMsg, QueryMsg as LinkQuery};
+use owned::contract::{get_owner, handle_accept_ownership, init as owned_init};
 use utils::median::calculate_median;
 
 use crate::{error::*, msg::*, state::*};
@@ -24,10 +25,10 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     recorded_funds(&mut deps.storage).save(&Funds::default())?;
     reporting_round_id(&mut deps.storage).save(&0)?;
 
-    let sender = deps.api.canonical_address(&env.message.sender)?;
     let link = deps.api.canonical_address(&msg.link)?;
     let validator = deps.api.canonical_address(&msg.validator)?;
-    owner(&mut deps.storage).save(&sender)?;
+
+    owned_init(deps, env.clone(), owned::msg::InitMsg {})?;
 
     config(&mut deps.storage).save(&State {
         link,
@@ -120,6 +121,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         HandleMsg::UpdateAvailableFunds {} => handle_update_available_funds(deps, env),
         HandleMsg::SetValidator { validator } => handle_set_validator(deps, env, validator),
         HandleMsg::Receive(receive_msg) => handle_receive(deps, env, receive_msg),
+        HandleMsg::TransferOwnership { to } => handle_transfer_ownership(deps, env, to),
+        HandleMsg::AcceptOwnership {} => handle_accept_ownership(deps, env),
     }
 }
 
@@ -872,6 +875,15 @@ pub fn handle_receive<S: Storage, A: Api, Q: Querier>(
     })
 }
 
+pub fn handle_transfer_ownership<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    to: HumanAddr,
+) -> StdResult<HandleResponse> {
+    let to = deps.api.canonical_address(&to)?;
+    owned::contract::handle_transfer_ownership(deps, env, to)
+}
+
 fn required_reserve(payment: Uint128, oracle_count: u8) -> Uint128 {
     Uint128(payment.u128() * oracle_count as u128 * RESERVE_ROUNDS)
 }
@@ -902,6 +914,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
             queried_round_id,
             timestamp,
         )),
+        QueryMsg::GetOwner {} => to_binary(&get_owner(deps)),
     }
 }
 
@@ -1056,9 +1069,8 @@ fn validate_ownership<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     env: &Env,
 ) -> StdResult<()> {
-    let sender = deps.api.canonical_address(&env.message.sender)?;
-    let owner = owner_read(&deps.storage).load()?;
-    if sender != owner {
+    let owner = get_owner(deps)?;
+    if env.message.sender != owner {
         return ContractErr::NotOwner.std_err();
     }
     Ok(())

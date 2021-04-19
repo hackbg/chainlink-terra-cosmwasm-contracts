@@ -3,6 +3,43 @@
   "title": "HandleMsg",
   "anyOf": [
     {
+      "description": "Initiate contract ownership transfer to another address. Can be used only by owner",
+      "type": "object",
+      "required": [
+        "transfer_ownership"
+      ],
+      "properties": {
+        "transfer_ownership": {
+          "type": "object",
+          "required": [
+            "to"
+          ],
+          "properties": {
+            "to": {
+              "description": "Address to transfer ownership to",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Finish contract ownership transfer. Can be used only by pending owner",
+      "type": "object",
+      "required": [
+        "accept_ownership"
+      ],
+      "properties": {
+        "accept_ownership": {
+          "type": "object"
+        }
+      }
+    },
+    {
       "description": "Invoked by oracles when they have witnessed a need to update",
       "type": "object",
       "required": [

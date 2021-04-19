@@ -29,6 +29,14 @@ pub struct InitMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
+    /// Initiate contract ownership transfer to another address.
+    /// Can be used only by owner
+    TransferOwnership {
+        /// Address to transfer ownership to
+        to: HumanAddr,
+    },
+    /// Finish contract ownership transfer. Can be used only by pending owner
+    AcceptOwnership {},
     /// Invoked by oracles when they have witnessed a need to update
     Submit {
         /// ID of the round this submission pertains to
@@ -119,6 +127,9 @@ pub enum HandleMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
+    /// Returns contract owner's address
+    /// Response [`HumanAddr`]
+    GetOwner {},
     /// Returns the settings of the flux aggregator
     /// Response: [`ConfigResponse`]
     GetAggregatorConfig {},

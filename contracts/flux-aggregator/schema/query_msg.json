@@ -3,6 +3,18 @@
   "title": "QueryMsg",
   "anyOf": [
     {
+      "description": "Returns contract owner's address Response [`HumanAddr`]",
+      "type": "object",
+      "required": [
+        "get_owner"
+      ],
+      "properties": {
+        "get_owner": {
+          "type": "object"
+        }
+      }
+    },
+    {
       "description": "Returns the settings of the flux aggregator Response: [`ConfigResponse`]",
       "type": "object",
       "required": [
