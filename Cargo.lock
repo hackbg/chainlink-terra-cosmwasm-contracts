@@ -599,13 +599,10 @@ dependencies = [
 name = "owned"
 version = "0.1.0"
 dependencies = [
- "chainlink-contract-utils",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
  "cosmwasm-vm",
- "cw20",
- "cw20-base",
  "schemars",
  "serde",
  "snafu",
