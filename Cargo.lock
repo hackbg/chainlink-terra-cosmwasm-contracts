@@ -395,6 +395,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "flags"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "schemars",
+ "serde",
+ "snafu",
+]
+
+[[package]]
 name = "flux-aggregator"
 version = "0.1.0"
 dependencies = [
