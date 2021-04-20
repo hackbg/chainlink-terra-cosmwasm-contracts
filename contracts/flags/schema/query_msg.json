@@ -5,13 +5,48 @@
     {
       "type": "object",
       "required": [
-        "get_count"
+        "get_flag"
       ],
       "properties": {
-        "get_count": {
-          "type": "object"
+        "get_flag": {
+          "type": "object",
+          "required": [
+            "subject"
+          ],
+          "properties": {
+            "subject": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_flags"
+      ],
+      "properties": {
+        "get_flags": {
+          "type": "object",
+          "required": [
+            "subjects"
+          ],
+          "properties": {
+            "subjects": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/HumanAddr"
+              }
+            }
+          }
         }
       }
     }
-  ]
+  ],
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    }
+  }
 }

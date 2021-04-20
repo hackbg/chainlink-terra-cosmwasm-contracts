@@ -1,16 +1,20 @@
+use crate::{error::*, msg::*, state::*};
 use cosmwasm_std::{
-    to_binary, log, Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, InitResponse, Querier,
-    StdError, StdResult, Storage,
+    log, to_binary, Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr,
+    InitResponse, Querier, StdError, StdResult, Storage,
 };
-
-use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{flags, flags_read};
+use owned::contract::{get_owner, init as owned_init};
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
+    owned_init(deps, env.clone(), owned::msg::InitMsg {})?;
+    config(&mut deps.storage).save(&State {
+        raising_access_controller: msg.rac_address,
+    })?;
+
     Ok(InitResponse::default())
 }
 
@@ -22,6 +26,10 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     match msg {
         HandleMsg::RaiseFlag { subject } => handle_raise_flag(deps, env, subject),
         HandleMsg::RaiseFlags { subjects } => handle_raise_flags(deps, env, subjects),
+        HandleMsg::LowerFlags { subjects } => handle_lower_flags(deps, env, subjects),
+        HandleMsg::SetRaisingAccessController { rac_address } => {
+            handle_set_raising_access_controller(deps, env, rac_address)
+        }
     }
 }
 
@@ -30,25 +38,25 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetFlag { subject } => todo!(),
+        QueryMsg::GetFlag { subject } => to_binary(&get_flag(deps, subject)),
         QueryMsg::GetFlags { subjects } => todo!(),
     }
 }
 
 pub fn handle_raise_flag<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
-    subject: CanonicalAddr,
+    _env: Env,
+    subject: HumanAddr,
 ) -> StdResult<HandleResponse> {
-    let key = subject.as_slice();
-    if flags_read(&mut deps.storage).may_load(subject.as_slice())?.is_none() {
-        flags(&mut deps.storage).save(key, &true)?;
+    let key = deps.api.canonical_address(&subject)?;
+    if flags_read(&mut deps.storage)
+        .may_load(key.as_slice())?
+        .is_none()
+    {
+        flags(&mut deps.storage).save(key.as_slice(), &true)?;
         Ok(HandleResponse {
             messages: vec![],
-            log: vec![
-                log("action", "raised flag"),
-                log("subject", subject)
-            ],
+            log: vec![log("action", "raised flag"), log("subject", subject)],
             data: None,
         })
     } else {
@@ -62,12 +70,13 @@ pub fn handle_raise_flag<S: Storage, A: Api, Q: Querier>(
 
 pub fn handle_raise_flags<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
-    subjects: Vec<CanonicalAddr>,
+    _env: Env,
+    subjects: Vec<HumanAddr>,
 ) -> StdResult<HandleResponse> {
     subjects.iter().for_each(|addr| {
+        let key = deps.api.canonical_address(&addr).unwrap();
         flags(&mut deps.storage)
-            .save(addr.as_slice(), &true)
+            .save(key.as_slice(), &true)
             .unwrap();
     });
     Ok(HandleResponse {
@@ -77,29 +86,83 @@ pub fn handle_raise_flags<S: Storage, A: Api, Q: Querier>(
     })
 }
 
+pub fn handle_lower_flags<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    subjects: Vec<HumanAddr>,
+) -> StdResult<HandleResponse> {
+    validate_ownership(deps, &env)?;
+    subjects.iter().for_each(|subject| {
+        let key = deps.api.canonical_address(&subject).unwrap();
+        if flags_read(&deps.storage)
+            .may_load(key.as_slice())
+            .unwrap()
+            .is_some()
+        {
+            flags(&mut deps.storage).save(key.as_slice(), &false);
+        }
+    });
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![],
+        data: None,
+    })
+}
+
+pub fn handle_set_raising_access_controller<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    _rac_address: HumanAddr,
+) -> StdResult<HandleResponse> {
+    validate_ownership(deps, &env)?;
+    todo!();
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![],
+        data: None,
+    })
+}
+
+pub fn get_flag<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    subject: HumanAddr,
+) -> StdResult<bool> {
+    let key = deps.api.canonical_address(&subject).unwrap();
+    flags_read(&deps.storage).load(key.as_slice())
+}
+
+pub fn get_flags<S: Storage, A: Api, Q: Querier>(
+    _deps: &Extern<S, A, Q>,
+    _subjectcs: Vec<HumanAddr>,
+) -> StdResult<Vec<bool>> {
+    todo!();
+    Ok(vec![])
+}
+
 fn validate_ownership<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     env: &Env,
 ) -> StdResult<()> {
-    // let owner = get_owner(deps)?;
-    // if env.message.sender != owner {
-    //     return ContractErr::NotOwner.std_err();
-    // }
+    let owner = get_owner(deps)?;
+    if env.message.sender != owner {
+        return ContractErr::NotOwner.std_err();
+    }
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, from_binary, StdError};
+    use cosmwasm_std::{coins, from_binary, HumanAddr, StdError};
 
     #[test]
     fn proper_initialization() {
         let mut deps = mock_dependencies(20, &[]);
 
-        let msg = InitMsg {};
+        let msg = InitMsg {
+            rac_address: HumanAddr::from("rac"),
+        };
         let env = mock_env("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
@@ -109,7 +172,7 @@ mod tests {
         let env = mock_env("human", &[]);
         let addr = deps.api.canonical_address(&env.message.sender).unwrap();
         let msg = HandleMsg::RaiseFlag {
-            subject: addr.clone(),
+            subject: HumanAddr::from(addr.clone()),
         };
 
         let _res = handle(&mut deps, env, msg);

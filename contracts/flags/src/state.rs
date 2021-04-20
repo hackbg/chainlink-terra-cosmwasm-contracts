@@ -3,15 +3,15 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{HumanAddr, Storage};
 use cosmwasm_storage::{
-    bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket,
-    ReadonlySingleton, Singleton,
+    bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
+    Singleton,
 };
 pub static CONFIG_KEY: &[u8] = b"config";
 pub static FLAG_KEY: &[u8] = b"flags";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
-    raising_access_controller: HumanAddr,
+    pub raising_access_controller: HumanAddr,
 }
 
 pub fn config<S: Storage>(storage: &mut S) -> Singleton<S, State> {

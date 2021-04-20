@@ -5,33 +5,89 @@
     {
       "type": "object",
       "required": [
-        "increment"
+        "raise_flag"
       ],
       "properties": {
-        "increment": {
-          "type": "object"
+        "raise_flag": {
+          "type": "object",
+          "required": [
+            "subject"
+          ],
+          "properties": {
+            "subject": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
         }
       }
     },
     {
       "type": "object",
       "required": [
-        "reset"
+        "raise_flags"
       ],
       "properties": {
-        "reset": {
+        "raise_flags": {
           "type": "object",
           "required": [
-            "count"
+            "subjects"
           ],
           "properties": {
-            "count": {
-              "type": "integer",
-              "format": "int32"
+            "subjects": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/HumanAddr"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "lower_flags"
+      ],
+      "properties": {
+        "lower_flags": {
+          "type": "object",
+          "required": [
+            "subjects"
+          ],
+          "properties": {
+            "subjects": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/HumanAddr"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "set_raising_access_controller"
+      ],
+      "properties": {
+        "set_raising_access_controller": {
+          "type": "object",
+          "required": [
+            "rac_address"
+          ],
+          "properties": {
+            "rac_address": {
+              "$ref": "#/definitions/HumanAddr"
             }
           }
         }
       }
     }
-  ]
+  ],
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    }
+  }
 }
