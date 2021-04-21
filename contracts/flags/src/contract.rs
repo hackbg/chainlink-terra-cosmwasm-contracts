@@ -1,6 +1,6 @@
 use crate::{error::*, msg::*, state::*};
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr,
+    log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr,
     InitResponse, Querier, StdError, StdResult, Storage,
 };
 use owned::contract::{get_owner, init as owned_init};
@@ -39,7 +39,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetFlag { subject } => to_binary(&get_flag(deps, subject)),
-        QueryMsg::GetFlags { subjects } => todo!(),
+        QueryMsg::GetFlags { subjects } => to_binary(&get_flags(deps, subjects)),
     }
 }
 
@@ -99,7 +99,7 @@ pub fn handle_lower_flags<S: Storage, A: Api, Q: Querier>(
             .unwrap()
             .is_some()
         {
-            flags(&mut deps.storage).save(key.as_slice(), &false);
+            flags(&mut deps.storage).save(key.as_slice(), &false).unwrap();
         }
     });
     Ok(HandleResponse {
@@ -112,10 +112,14 @@ pub fn handle_lower_flags<S: Storage, A: Api, Q: Querier>(
 pub fn handle_set_raising_access_controller<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    _rac_address: HumanAddr,
+    rac_address: HumanAddr,
 ) -> StdResult<HandleResponse> {
     validate_ownership(deps, &env)?;
-    todo!();
+    config(&mut deps.storage).update(|_state| {
+        Ok(State {
+            raising_access_controller: rac_address,
+        })
+    })?;
     Ok(HandleResponse {
         messages: vec![],
         log: vec![],
@@ -132,11 +136,18 @@ pub fn get_flag<S: Storage, A: Api, Q: Querier>(
 }
 
 pub fn get_flags<S: Storage, A: Api, Q: Querier>(
-    _deps: &Extern<S, A, Q>,
-    _subjectcs: Vec<HumanAddr>,
+    deps: &Extern<S, A, Q>,
+    subjects: Vec<HumanAddr>,
 ) -> StdResult<Vec<bool>> {
-    todo!();
-    Ok(vec![])
+    let flags = subjects
+        .iter()
+        .map(|subject| {
+            flags_read(&deps.storage)
+                .load(deps.api.canonical_address(subject).unwrap().as_slice())
+                .unwrap()
+        })
+        .collect();
+    Ok(flags)
 }
 
 fn validate_ownership<S: Storage, A: Api, Q: Querier>(
@@ -172,7 +183,7 @@ mod tests {
         let env = mock_env("human", &[]);
         let addr = deps.api.canonical_address(&env.message.sender).unwrap();
         let msg = HandleMsg::RaiseFlag {
-            subject: HumanAddr::from(addr.clone()),
+            subject: deps.api.human_address(&addr.clone()).unwrap(),
         };
 
         let _res = handle(&mut deps, env, msg);
