@@ -1,7 +1,7 @@
 use crate::{error::*, msg::*, state::*};
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr,
-    InitResponse, Querier, StdError, StdResult, Storage,
+    log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
+    StdError, StdResult, Storage,
 };
 use owned::contract::{get_owner, init as owned_init};
 
@@ -99,7 +99,9 @@ pub fn handle_lower_flags<S: Storage, A: Api, Q: Querier>(
             .unwrap()
             .is_some()
         {
-            flags(&mut deps.storage).save(key.as_slice(), &false).unwrap();
+            flags(&mut deps.storage)
+                .save(key.as_slice(), &false)
+                .unwrap();
         }
     });
     Ok(HandleResponse {
