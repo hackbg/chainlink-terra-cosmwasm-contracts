@@ -10,7 +10,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    owned_init(deps, env.clone(), owned::msg::InitMsg {})?;
+    owned_init(deps, env, owned::msg::InitMsg {})?;
     config(&mut deps.storage).save(&State {
         raising_access_controller: msg.rac_address,
     })?;
@@ -50,7 +50,7 @@ pub fn handle_raise_flag<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     check_access(deps)?;
     let key = deps.api.canonical_address(&subject)?;
-    if flags_read(&mut deps.storage)
+    if flags_read(&deps.storage)
         .may_load(key.as_slice())?
         .is_none()
     {
