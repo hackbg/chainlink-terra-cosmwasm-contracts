@@ -63,7 +63,7 @@ pub fn handle_raise_flag<S: Storage, A: Api, Q: Querier>(
     } else {
         Ok(HandleResponse {
             messages: vec![],
-            log: vec![],
+            log: vec![log("action", "flag raised"), log("address", subject)],
             data: None,
         })
     }
@@ -75,15 +75,17 @@ pub fn handle_raise_flags<S: Storage, A: Api, Q: Querier>(
     subjects: Vec<HumanAddr>,
 ) -> StdResult<HandleResponse> {
     check_access(deps)?;
+    let mut logs = vec![];
     subjects.iter().for_each(|addr| {
         let key = deps.api.canonical_address(&addr).unwrap();
         flags(&mut deps.storage)
             .save(key.as_slice(), &true)
             .unwrap();
+        logs.extend_from_slice(&[log("action", "flag raised"), log("address", addr)])
     });
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![], // TODO: add logs
+        log: logs,
         data: None,
     })
 }
@@ -94,6 +96,7 @@ pub fn handle_lower_flags<S: Storage, A: Api, Q: Querier>(
     subjects: Vec<HumanAddr>,
 ) -> StdResult<HandleResponse> {
     validate_ownership(deps, &env)?;
+    let mut logs = vec![];
     subjects.iter().for_each(|subject| {
         let key = deps.api.canonical_address(&subject).unwrap();
         if flags_read(&deps.storage)
@@ -104,11 +107,12 @@ pub fn handle_lower_flags<S: Storage, A: Api, Q: Querier>(
             flags(&mut deps.storage)
                 .save(key.as_slice(), &false)
                 .unwrap();
+            logs.extend_from_slice(&[log("action", "flag lowered"), log("address", subject)])
         }
     });
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![],
+        log: logs,
         data: None,
     })
 }
