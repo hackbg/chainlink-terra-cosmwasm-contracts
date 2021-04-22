@@ -1,7 +1,7 @@
 use crate::{error::*, msg::*, state::*};
 use cosmwasm_std::{
     log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
-    StdError, StdResult, Storage,
+    StdResult, Storage,
 };
 use owned::contract::{get_owner, init as owned_init};
 
@@ -48,6 +48,7 @@ pub fn handle_raise_flag<S: Storage, A: Api, Q: Querier>(
     _env: Env,
     subject: HumanAddr,
 ) -> StdResult<HandleResponse> {
+    check_access(deps)?;
     let key = deps.api.canonical_address(&subject)?;
     if flags_read(&mut deps.storage)
         .may_load(key.as_slice())?
@@ -73,6 +74,7 @@ pub fn handle_raise_flags<S: Storage, A: Api, Q: Querier>(
     _env: Env,
     subjects: Vec<HumanAddr>,
 ) -> StdResult<HandleResponse> {
+    check_access(deps)?;
     subjects.iter().for_each(|addr| {
         let key = deps.api.canonical_address(&addr).unwrap();
         flags(&mut deps.storage)
@@ -133,6 +135,7 @@ pub fn get_flag<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     subject: HumanAddr,
 ) -> StdResult<bool> {
+    check_access(deps)?;
     let key = deps.api.canonical_address(&subject).unwrap();
     flags_read(&deps.storage).load(key.as_slice())
 }
@@ -141,6 +144,7 @@ pub fn get_flags<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     subjects: Vec<HumanAddr>,
 ) -> StdResult<Vec<bool>> {
+    check_access(deps)?;
     let flags = subjects
         .iter()
         .map(|subject| {
@@ -163,11 +167,19 @@ fn validate_ownership<S: Storage, A: Api, Q: Querier>(
     Ok(())
 }
 
+// TODO this needs to be an actual call to access controller
+fn check_access<S: Storage, A: Api, Q: Querier>(_deps: &Extern<S, A, Q>) -> StdResult<()> {
+    if false {
+        return ContractErr::NoAccess.std_err();
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, from_binary, HumanAddr, StdError};
+    use cosmwasm_std::{coins, from_binary, HumanAddr};
 
     #[test]
     fn proper_initialization() {
@@ -181,16 +193,65 @@ mod tests {
         // we can just call .unwrap() to assert this was a success
         let res = init(&mut deps, env, msg).unwrap();
         assert_eq!(0, res.messages.len());
+    }
+
+    #[test]
+    fn raise_flag() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let msg = InitMsg {
+            rac_address: HumanAddr::from("rac"),
+        };
+        let env = mock_env("creator", &coins(1000, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res = init(&mut deps, env, msg).unwrap();
+        assert_eq!(0, res.messages.len());
 
         let env = mock_env("human", &[]);
-        let addr = deps.api.canonical_address(&env.message.sender).unwrap();
+        let addr = env.message.sender.clone();
         let msg = HandleMsg::RaiseFlag {
-            subject: deps.api.human_address(&addr.clone()).unwrap(),
+            subject: addr.clone(),
         };
 
         let _res = handle(&mut deps, env, msg);
 
-        let flag = flags_read(&deps.storage).load(addr.as_slice()).unwrap();
-        assert_eq!(true, flag);
+        let res = query(&deps, QueryMsg::GetFlag { subject: addr }).unwrap();
+
+        let flag: StdResult<bool> = from_binary(&res).unwrap();
+        assert_eq!(true, flag.unwrap());
+    }
+
+    #[test]
+    fn raise_flags() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let msg = InitMsg {
+            rac_address: HumanAddr::from("rac"),
+        };
+        let env = mock_env("creator", &coins(1000, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res = init(&mut deps, env, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let env = mock_env("human", &[]);
+        let addr = env.message.sender.clone();
+        let msg = HandleMsg::RaiseFlags {
+            subjects: vec![addr.clone()],
+        };
+
+        let _res = handle(&mut deps, env, msg);
+
+        let res = query(
+            &deps,
+            QueryMsg::GetFlags {
+                subjects: vec![addr],
+            },
+        )
+        .unwrap();
+
+        let flag: StdResult<Vec<bool>> = from_binary(&res).unwrap();
+        assert_eq!(vec![true], flag.unwrap());
     }
 }

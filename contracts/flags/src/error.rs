@@ -6,6 +6,8 @@ pub enum ContractErr {
     /// Only callable by owner
     #[error("Only callable by owner")]
     NotOwner,
+    #[error("No Access")]
+    NoAccess,
 }
 
 impl ContractErr {
