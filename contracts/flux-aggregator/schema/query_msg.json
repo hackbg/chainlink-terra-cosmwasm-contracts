@@ -170,8 +170,7 @@
           "type": "object",
           "required": [
             "oracle",
-            "queried_round_id",
-            "timestamp"
+            "queried_round_id"
           ],
           "properties": {
             "oracle": {
@@ -186,11 +185,6 @@
               "description": "Round for which to look up",
               "type": "integer",
               "format": "uint32",
-              "minimum": 0.0
-            },
-            "timestamp": {
-              "type": "integer",
-              "format": "uint64",
               "minimum": 0.0
             }
           }
