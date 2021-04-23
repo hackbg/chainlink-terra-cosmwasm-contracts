@@ -173,7 +173,6 @@ pub enum QueryMsg {
         oracle: HumanAddr,
         /// Round for which to look up
         queried_round_id: u32,
-        timestamp: u64,
     },
 }
 

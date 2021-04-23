@@ -907,13 +907,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::GetOracleRoundState {
             oracle,
             queried_round_id,
-            timestamp,
-        } => to_binary(&get_oracle_round_state(
-            deps,
-            oracle,
-            queried_round_id,
-            timestamp,
-        )),
+        } => to_binary(&get_oracle_round_state(deps, oracle, queried_round_id)),
         QueryMsg::GetOwner {} => to_binary(&get_owner(deps)),
     }
 }
@@ -1012,57 +1006,9 @@ pub fn get_oracle_round_state<S: Storage, A: Api, Q: Querier>(
     _deps: &Extern<S, A, Q>,
     _oracle: HumanAddr,
     _queried_round_id: u32,
-    _timestamp: u64, // Sending a timestamp from the client might not be a valid solution
 ) -> StdResult<OracleRoundStateResponse> {
+    // Implementation requires Env
     todo!()
-    // let oracle_addr = deps.api.canonical_address(&oracle)?;
-
-    // let oracle_count = get_oracle_count(deps)?;
-
-    // if queried_round_id > 0 {
-    //     let round_key = &queried_round_id.to_be_bytes();
-    //     let round = rounds_read(&deps.storage).load(round_key)?;
-    //     let round_details = details_read(&deps.storage).load(round_key)?;
-    //     let oracle_status = oracles_read(&deps.storage).load(oracle_addr.as_slice())?;
-    //     let available_funds = recorded_funds_read(&deps.storage).load()?.available;
-    //     let State {
-    //         restart_delay,
-    //         payment_amount,
-    //         ..
-    //     } = config_read(&deps.storage).load()?;
-
-    //     let is_elegible = if round.started_at.unwrap() > 0 {
-    //         is_accepting_submissions(&deps.storage, queried_round_id)?
-    //             && validate_oracle_round(&deps.storage, oracle_addr, queried_round_id, timestamp)
-    //                 .is_ok()
-    //     } else {
-    //         let is_delayed = queried_round_id
-    //             > oracle_status.last_started_round.unwrap() + restart_delay
-    //             || oracle_status.last_started_round.unwrap() == 0;
-
-    //         is_delayed
-    //             && validate_oracle_round(&deps.storage, oracle_addr, queried_round_id, timestamp)
-    //                 .is_ok()
-    //     };
-    //     let payment = if round.started_at.unwrap() > 0 {
-    //         round_details.payment_amount
-    //     } else {
-    //         payment_amount
-    //     };
-
-    //     Ok(OracleRoundStateResponse {
-    //         elegible_to_submit: is_elegible,
-    //         round_id: queried_round_id,
-    //         latest_submission: oracle_status.latest_submission,
-    //         started_at: round.started_at.unwrap(),
-    //         timeout: round_details.timeout,
-    //         available_funds,
-    //         oracle_count,
-    //         payment_amount: payment,
-    //     })
-    // } else {
-    //     unimplemented!()
-    // }
 }
 
 fn validate_ownership<S: Storage, A: Api, Q: Querier>(
