@@ -3,15 +3,198 @@
   "title": "QueryMsg",
   "anyOf": [
     {
+      "description": "Returns contract owner's address Response [`HumanAddr`]",
       "type": "object",
       "required": [
-        "get_count"
+        "get_owner"
       ],
       "properties": {
-        "get_count": {
+        "get_owner": {
           "type": "object"
         }
       }
+    },
+    {
+      "description": "Returns the settings of the flux aggregator Response: [`ConfigResponse`]",
+      "type": "object",
+      "required": [
+        "get_aggregator_config"
+      ],
+      "properties": {
+        "get_aggregator_config": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Get the amount of payment yet to be withdrawn by oracles. Response: [`Uint128`].",
+      "type": "object",
+      "required": [
+        "get_allocated_funds"
+      ],
+      "properties": {
+        "get_allocated_funds": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Get the amount of future funding available to oracles. Response: [`Uint128`].",
+      "type": "object",
+      "required": [
+        "get_available_funds"
+      ],
+      "properties": {
+        "get_available_funds": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Query the available amount of LINK for an oracle to withdraw. Response: [`Uint128`].",
+      "type": "object",
+      "required": [
+        "get_withdrawable_payment"
+      ],
+      "properties": {
+        "get_withdrawable_payment": {
+          "type": "object",
+          "required": [
+            "oracle"
+          ],
+          "properties": {
+            "oracle": {
+              "description": "Address of the Oracle which is query for",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Query the number of oracles Response: [`u8`].",
+      "type": "object",
+      "required": [
+        "get_oracle_count"
+      ],
+      "properties": {
+        "get_oracle_count": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Query for the addresses of the oracles on the contract Response: [`Vec<HumanAddr>`].",
+      "type": "object",
+      "required": [
+        "get_oracles"
+      ],
+      "properties": {
+        "get_oracles": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Get the admin address of a specific Oracle Response: [`HumanAddr`].",
+      "type": "object",
+      "required": [
+        "get_admin"
+      ],
+      "properties": {
+        "get_admin": {
+          "type": "object",
+          "required": [
+            "oracle"
+          ],
+          "properties": {
+            "oracle": {
+              "description": "The address of the oracle whose admin is being queried",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Query data for a specific round Response: [`RoundDataResponse`].",
+      "type": "object",
+      "required": [
+        "get_round_data"
+      ],
+      "properties": {
+        "get_round_data": {
+          "type": "object",
+          "required": [
+            "round_id"
+          ],
+          "properties": {
+            "round_id": {
+              "description": "The round ID to retrieve the round data for",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Query data for the latest round Response: [`RoundDataResponse`].",
+      "type": "object",
+      "required": [
+        "get_latest_round_data"
+      ],
+      "properties": {
+        "get_latest_round_data": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Unimplemented Response: [`OracleRoundStateResponse`].",
+      "type": "object",
+      "required": [
+        "get_oracle_round_state"
+      ],
+      "properties": {
+        "get_oracle_round_state": {
+          "type": "object",
+          "required": [
+            "oracle",
+            "queried_round_id"
+          ],
+          "properties": {
+            "oracle": {
+              "description": "Oracle address to look up for",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            },
+            "queried_round_id": {
+              "description": "Round for which to look up",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      }
     }
-  ]
+  ],
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    }
+  }
 }

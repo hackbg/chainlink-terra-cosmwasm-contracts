@@ -17,7 +17,8 @@ use link_token::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-static WASM: &[u8] = include_bytes!("../../../artifacts/link_token.wasm");
+static WASM: &[u8] =
+    include_bytes!("../../../target/wasm32-unknown-unknown/release/link_token.wasm");
 
 fn default_init() -> (Instance<MockStorage, MockApi, MockQuerier<Empty>>, Env) {
     let mut deps = mock_instance(WASM, &[]);
