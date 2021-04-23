@@ -76,13 +76,16 @@ pub fn handle_raise_flags<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     check_access(deps)?;
     let mut logs = vec![];
-    subjects.iter().for_each(|addr| {
-        let key = deps.api.canonical_address(&addr).unwrap();
-        flags(&mut deps.storage)
-            .save(key.as_slice(), &true)
-            .unwrap();
-        logs.extend_from_slice(&[log("action", "flag raised"), log("address", addr)])
-    });
+    for subject in subjects {
+        let key = deps.api.canonical_address(&subject)?;
+        if flags_read(&deps.storage)
+            .may_load(key.as_slice())?
+            .is_none()
+        {
+            flags(&mut deps.storage).save(key.as_slice(), &true)?;
+        }
+        logs.extend_from_slice(&[log("action", "flag raised"), log("address", subject)])
+    }
     Ok(HandleResponse {
         messages: vec![],
         log: logs,
@@ -97,19 +100,13 @@ pub fn handle_lower_flags<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     validate_ownership(deps, &env)?;
     let mut logs = vec![];
-    subjects.iter().for_each(|subject| {
-        let key = deps.api.canonical_address(&subject).unwrap();
-        if flags_read(&deps.storage)
-            .may_load(key.as_slice())
-            .unwrap()
-            .is_some()
-        {
-            flags(&mut deps.storage)
-                .save(key.as_slice(), &false)
-                .unwrap();
-            logs.extend_from_slice(&[log("action", "flag lowered"), log("address", subject)])
+    for subject in subjects {
+        let key = deps.api.canonical_address(&subject)?;
+        if flags_read(&deps.storage).may_load(key.as_slice()).is_ok() {
+            flags(&mut deps.storage).save(key.as_slice(), &false)?;
+            logs.extend_from_slice(&[log("action", "flag lowered"), log("address", subject)]);
         }
-    });
+    }
     Ok(HandleResponse {
         messages: vec![],
         log: logs,
@@ -123,14 +120,19 @@ pub fn handle_set_raising_access_controller<S: Storage, A: Api, Q: Querier>(
     rac_address: HumanAddr,
 ) -> StdResult<HandleResponse> {
     validate_ownership(deps, &env)?;
+    let prev_rac = config_read(&deps.storage).load()?.raising_access_controller;
     config(&mut deps.storage).update(|_state| {
         Ok(State {
-            raising_access_controller: rac_address,
+            raising_access_controller: rac_address.clone(),
         })
     })?;
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![],
+        log: vec![
+            log("action", "raising access controller updated"),
+            log("address", rac_address),
+            log("previous", prev_rac),
+        ],
         data: None,
     })
 }
@@ -140,7 +142,7 @@ pub fn get_flag<S: Storage, A: Api, Q: Querier>(
     subject: HumanAddr,
 ) -> StdResult<bool> {
     check_access(deps)?;
-    let key = deps.api.canonical_address(&subject).unwrap();
+    let key = deps.api.canonical_address(&subject)?;
     flags_read(&deps.storage).load(key.as_slice())
 }
 
@@ -151,10 +153,11 @@ pub fn get_flags<S: Storage, A: Api, Q: Querier>(
     check_access(deps)?;
     let flags = subjects
         .iter()
-        .map(|subject| {
-            flags_read(&deps.storage)
-                .load(deps.api.canonical_address(subject).unwrap().as_slice())
-                .unwrap()
+        .filter_map(|subject| {
+            let flag = flags_read(&deps.storage)
+                .load(deps.api.canonical_address(subject).ok()?.as_slice())
+                .ok()?;
+            Some(flag)
         })
         .collect();
     Ok(flags)
