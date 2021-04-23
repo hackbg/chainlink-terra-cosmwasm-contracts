@@ -10,7 +10,8 @@ use cosmwasm_vm::{
     Api, Storage,
 };
 
-static WASM: &[u8] = include_bytes!("../../../artifacts/chainlink_client.wasm");
+static WASM: &[u8] =
+    include_bytes!("../../../target/wasm32-unknown-unknown/release/chainlink_client.wasm");
 
 #[test]
 fn test_init() {

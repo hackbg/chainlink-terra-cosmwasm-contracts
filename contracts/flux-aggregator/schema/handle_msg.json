@@ -3,35 +3,459 @@
   "title": "HandleMsg",
   "anyOf": [
     {
+      "description": "Initiate contract ownership transfer to another address. Can be used only by owner",
       "type": "object",
       "required": [
-        "increment"
+        "transfer_ownership"
       ],
       "properties": {
-        "increment": {
+        "transfer_ownership": {
+          "type": "object",
+          "required": [
+            "to"
+          ],
+          "properties": {
+            "to": {
+              "description": "Address to transfer ownership to",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Finish contract ownership transfer. Can be used only by pending owner",
+      "type": "object",
+      "required": [
+        "accept_ownership"
+      ],
+      "properties": {
+        "accept_ownership": {
           "type": "object"
         }
       }
     },
     {
+      "description": "Invoked by oracles when they have witnessed a need to update",
       "type": "object",
       "required": [
-        "reset"
+        "submit"
       ],
       "properties": {
-        "reset": {
+        "submit": {
           "type": "object",
           "required": [
-            "count"
+            "round_id",
+            "submission"
           ],
           "properties": {
-            "count": {
+            "round_id": {
+              "description": "ID of the round this submission pertains to",
               "type": "integer",
-              "format": "int32"
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "submission": {
+              "description": "The updated data that the oracle is submitting",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
             }
           }
         }
       }
+    },
+    {
+      "description": "Invoked by the owner to remove and add new oracles as well as update the round related parameters that pertain to total oracle count",
+      "type": "object",
+      "required": [
+        "change_oracles"
+      ],
+      "properties": {
+        "change_oracles": {
+          "type": "object",
+          "required": [
+            "added",
+            "added_admins",
+            "max_submissions",
+            "min_submissions",
+            "removed",
+            "restart_delay"
+          ],
+          "properties": {
+            "added": {
+              "description": "Oracles to be added",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/HumanAddr"
+              }
+            },
+            "added_admins": {
+              "description": "Admins to be added. Only this address is allowed to access the respective oracle's funds",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/HumanAddr"
+              }
+            },
+            "max_submissions": {
+              "description": "The new maximum submission count for each round",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "min_submissions": {
+              "description": "The new minimum submission count for each round",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "removed": {
+              "description": "Oracles to be removed",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/HumanAddr"
+              }
+            },
+            "restart_delay": {
+              "description": "The number of rounds an Oracle has to wait before they can initiate a round",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Transfer LINK from oracle to another address. Callable only by oracle's admin",
+      "type": "object",
+      "required": [
+        "withdraw_payment"
+      ],
+      "properties": {
+        "withdraw_payment": {
+          "type": "object",
+          "required": [
+            "amount",
+            "oracle",
+            "recipient"
+          ],
+          "properties": {
+            "amount": {
+              "description": "Amount of LINK to be send",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            },
+            "oracle": {
+              "description": "Oracle whose LINK is to be transferred",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            },
+            "recipient": {
+              "description": "Transfer recipient",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Transfers the contract owner's LINK to another address",
+      "type": "object",
+      "required": [
+        "withdraw_funds"
+      ],
+      "properties": {
+        "withdraw_funds": {
+          "type": "object",
+          "required": [
+            "amount",
+            "recipient"
+          ],
+          "properties": {
+            "amount": {
+              "description": "LINK to be sent",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            },
+            "recipient": {
+              "description": "Recipient address",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Transfer admin address for an oracle",
+      "type": "object",
+      "required": [
+        "transfer_admin"
+      ],
+      "properties": {
+        "transfer_admin": {
+          "type": "object",
+          "required": [
+            "new_admin",
+            "oracle"
+          ],
+          "properties": {
+            "new_admin": {
+              "description": "New admin address",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            },
+            "oracle": {
+              "description": "The oracle adddress whose admin is being transferred",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Accept the pending admin transfer for an oracle",
+      "type": "object",
+      "required": [
+        "accept_admin"
+      ],
+      "properties": {
+        "accept_admin": {
+          "type": "object",
+          "required": [
+            "oracle"
+          ],
+          "properties": {
+            "oracle": {
+              "description": "Address of the oracle whose admin is being transfered",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Allows non-oracles to request a new round. Response contains the new `round_id` ([`u32`]).",
+      "type": "object",
+      "required": [
+        "request_new_round"
+      ],
+      "properties": {
+        "request_new_round": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Allows/disallows non-oracles to start new rounds. Callable only by contract owner",
+      "type": "object",
+      "required": [
+        "set_requester_permissions"
+      ],
+      "properties": {
+        "set_requester_permissions": {
+          "type": "object",
+          "required": [
+            "authorized",
+            "delay",
+            "requester"
+          ],
+          "properties": {
+            "authorized": {
+              "description": "Is requester authorized",
+              "type": "boolean"
+            },
+            "delay": {
+              "description": "The number of rounds the requester must wait before starting another round",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "requester": {
+              "description": "Address to set permission for",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Update the round and payment related parameters for subsequent rounds",
+      "type": "object",
+      "required": [
+        "update_future_rounds"
+      ],
+      "properties": {
+        "update_future_rounds": {
+          "type": "object",
+          "required": [
+            "max_submissions",
+            "min_submissions",
+            "payment_amount",
+            "restart_delay",
+            "timeout"
+          ],
+          "properties": {
+            "max_submissions": {
+              "description": "The new maximum submission count for each round",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "min_submissions": {
+              "description": "The new minimum submission count for each round",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "payment_amount": {
+              "description": "Payment amount for subsequent rounds",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            },
+            "restart_delay": {
+              "description": "The number of rounds an Oracle has to wait before they can initiate a round",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "timeout": {
+              "description": "The new timeout to be used for future rounds",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Recalculate available LINK for payouts",
+      "type": "object",
+      "required": [
+        "update_available_funds"
+      ],
+      "properties": {
+        "update_available_funds": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Updates the address which does external data validation",
+      "type": "object",
+      "required": [
+        "set_validator"
+      ],
+      "properties": {
+        "set_validator": {
+          "type": "object",
+          "required": [
+            "validator"
+          ],
+          "properties": {
+            "validator": {
+              "description": "Address of the new validation contract",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Handler for LINK token Send message",
+      "type": "object",
+      "required": [
+        "receive"
+      ],
+      "properties": {
+        "receive": {
+          "$ref": "#/definitions/Cw20ReceiveMsg"
+        }
+      }
     }
-  ]
+  ],
+  "definitions": {
+    "Binary": {
+      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
+      "type": "string"
+    },
+    "Cw20ReceiveMsg": {
+      "description": "Cw20ReceiveMsg should be de/serialized under `Receive()` variant in a HandleMsg",
+      "type": "object",
+      "required": [
+        "amount",
+        "sender"
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "msg": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Binary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sender": {
+          "$ref": "#/definitions/HumanAddr"
+        }
+      }
+    },
+    "HumanAddr": {
+      "type": "string"
+    },
+    "Uint128": {
+      "type": "string"
+    }
+  }
 }

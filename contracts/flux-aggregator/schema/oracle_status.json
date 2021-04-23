@@ -1,63 +1,71 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "State",
+  "title": "OracleStatus",
   "type": "object",
   "required": [
-    "decimals",
-    "description",
-    "link",
-    "max_submission_count",
-    "max_submission_value",
-    "min_submission_count",
-    "min_submission_value",
-    "payment_amount",
-    "restart_delay",
-    "timeout",
-    "validator"
+    "admin",
+    "ending_round",
+    "index",
+    "starting_round",
+    "withdrawable"
   ],
   "properties": {
-    "decimals": {
-      "type": "integer",
-      "format": "uint8",
-      "minimum": 0.0
-    },
-    "description": {
-      "type": "string"
-    },
-    "link": {
+    "admin": {
       "$ref": "#/definitions/CanonicalAddr"
     },
-    "max_submission_count": {
+    "ending_round": {
       "type": "integer",
       "format": "uint32",
       "minimum": 0.0
     },
-    "max_submission_value": {
+    "index": {
+      "type": "integer",
+      "format": "uint16",
+      "minimum": 0.0
+    },
+    "last_reported_round": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "last_started_round": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "latest_submission": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Uint128"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pending_admin": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/CanonicalAddr"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "starting_round": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "withdrawable": {
       "$ref": "#/definitions/Uint128"
-    },
-    "min_submission_count": {
-      "type": "integer",
-      "format": "uint32",
-      "minimum": 0.0
-    },
-    "min_submission_value": {
-      "$ref": "#/definitions/Uint128"
-    },
-    "payment_amount": {
-      "$ref": "#/definitions/Uint128"
-    },
-    "restart_delay": {
-      "type": "integer",
-      "format": "uint32",
-      "minimum": 0.0
-    },
-    "timeout": {
-      "type": "integer",
-      "format": "uint32",
-      "minimum": 0.0
-    },
-    "validator": {
-      "$ref": "#/definitions/CanonicalAddr"
     }
   },
   "definitions": {
