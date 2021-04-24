@@ -51,20 +51,20 @@ pub fn handle_raise_flag<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     check_access(deps)?;
     let key = deps.api.canonical_address(&subject)?;
-    if flags_read(&deps.storage)
-        .may_load(key.as_slice())?
-        .is_none()
-    {
+    if flags_read(&deps.storage).may_load(key.as_slice())? == Some(true) {
+        Ok(HandleResponse {
+            messages: vec![],
+            log: vec![
+                log("action", "already raised flag"),
+                log("subject", subject),
+            ],
+            data: None,
+        })
+    } else {
         flags(&mut deps.storage).save(key.as_slice(), &true)?;
         Ok(HandleResponse {
             messages: vec![],
             log: vec![log("action", "raised flag"), log("subject", subject)],
-            data: None,
-        })
-    } else {
-        Ok(HandleResponse {
-            messages: vec![],
-            log: vec![log("action", "flag raised"), log("address", subject)],
             data: None,
         })
     }
@@ -79,13 +79,15 @@ pub fn handle_raise_flags<S: Storage, A: Api, Q: Querier>(
     let mut logs = vec![];
     for subject in subjects {
         let key = deps.api.canonical_address(&subject)?;
-        if flags_read(&deps.storage)
-            .may_load(key.as_slice())?
-            .is_none()
-        {
+        if flags_read(&deps.storage).may_load(key.as_slice())? == Some(true) {
+            logs.extend_from_slice(&[
+                log("action", "flag already raised"),
+                log("address", subject),
+            ]);
+        } else {
             flags(&mut deps.storage).save(key.as_slice(), &true)?;
+            logs.extend_from_slice(&[log("action", "flag raised"), log("address", subject)]);
         }
-        logs.extend_from_slice(&[log("action", "flag raised"), log("address", subject)])
     }
     Ok(HandleResponse {
         messages: vec![],
