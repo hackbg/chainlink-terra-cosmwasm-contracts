@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QueryMsg",
+  "anyOf": [
+    {
+      "type": "object",
+      "required": [
+        "get_flag"
+      ],
+      "properties": {
+        "get_flag": {
+          "type": "object",
+          "required": [
+            "subject"
+          ],
+          "properties": {
+            "subject": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_flags"
+      ],
+      "properties": {
+        "get_flags": {
+          "type": "object",
+          "required": [
+            "subjects"
+          ],
+          "properties": {
+            "subjects": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/HumanAddr"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_rac"
+      ],
+      "properties": {
+        "get_rac": {
+          "type": "object"
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    }
+  }
+}
