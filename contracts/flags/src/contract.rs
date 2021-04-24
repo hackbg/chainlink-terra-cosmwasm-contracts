@@ -105,7 +105,7 @@ pub fn handle_lower_flags<S: Storage, A: Api, Q: Querier>(
     let mut logs = vec![];
     for subject in subjects {
         let key = deps.api.canonical_address(&subject)?;
-        if flags_read(&deps.storage).may_load(key.as_slice()).is_ok() {
+        if flags_read(&deps.storage).may_load(key.as_slice())? == Some(true) {
             flags(&mut deps.storage).save(key.as_slice(), &false)?;
             logs.extend_from_slice(&[log("action", "flag lowered"), log("address", subject)]);
         }
