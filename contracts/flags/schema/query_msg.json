@@ -42,6 +42,17 @@
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_rac"
+      ],
+      "properties": {
+        "get_rac": {
+          "type": "object"
+        }
+      }
     }
   ],
   "definitions": {

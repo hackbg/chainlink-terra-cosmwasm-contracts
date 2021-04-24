@@ -40,6 +40,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     match msg {
         QueryMsg::GetFlag { subject } => to_binary(&get_flag(deps, subject)),
         QueryMsg::GetFlags { subjects } => to_binary(&get_flags(deps, subjects)),
+        QueryMsg::GetRac {} => to_binary(&get_rac(deps)),
     }
 }
 
@@ -161,6 +162,11 @@ pub fn get_flags<S: Storage, A: Api, Q: Querier>(
         })
         .collect();
     Ok(flags)
+}
+
+pub fn get_rac<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<HumanAddr> {
+    let raising_access_controller = config_read(&deps.storage).load()?.raising_access_controller;
+    Ok(raising_access_controller)
 }
 
 fn validate_ownership<S: Storage, A: Api, Q: Querier>(

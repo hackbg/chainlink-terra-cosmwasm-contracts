@@ -22,4 +22,5 @@ pub enum HandleMsg {
 pub enum QueryMsg {
     GetFlag { subject: HumanAddr },
     GetFlags { subjects: Vec<HumanAddr> },
+    GetRac {},
 }
