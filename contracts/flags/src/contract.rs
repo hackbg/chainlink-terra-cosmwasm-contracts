@@ -81,12 +81,12 @@ pub fn handle_raise_flags<S: Storage, A: Api, Q: Querier>(
         let key = deps.api.canonical_address(&subject)?;
         if flags_read(&deps.storage).may_load(key.as_slice())? == Some(true) {
             logs.extend_from_slice(&[
-                log("action", "flag already raised"),
-                log("address", subject),
+                log("action", "already raised flag"),
+                log("subject", subject),
             ]);
         } else {
             flags(&mut deps.storage).save(key.as_slice(), &true)?;
-            logs.extend_from_slice(&[log("action", "flag raised"), log("address", subject)]);
+            logs.extend_from_slice(&[log("action", "flag raised"), log("subject", subject)]);
         }
     }
     Ok(HandleResponse {
@@ -229,12 +229,28 @@ mod tests {
             subject: addr.clone(),
         };
 
-        let _res = handle(&mut deps, env, msg);
+        let _res = handle(&mut deps, env.clone(), msg.clone());
 
-        let res = query(&deps, QueryMsg::GetFlag { subject: addr }).unwrap();
+        let res = query(
+            &deps,
+            QueryMsg::GetFlag {
+                subject: addr.clone(),
+            },
+        )
+        .unwrap();
 
         let flag: StdResult<bool> = from_binary(&res).unwrap();
         assert_eq!(true, flag.unwrap());
+
+        // trying to raise the flag when it's already raised
+        let res = handle(&mut deps, env.clone(), msg.clone());
+        assert_eq!(
+            vec![
+                log("action", "already raised flag"),
+                log("subject", addr.clone())
+            ],
+            res.unwrap().log
+        );
     }
 
     #[test]
@@ -256,17 +272,26 @@ mod tests {
             subjects: vec![addr.clone()],
         };
 
-        let _res = handle(&mut deps, env, msg);
+        let _res = handle(&mut deps, env.clone(), msg.clone());
 
         let res = query(
             &deps,
             QueryMsg::GetFlags {
-                subjects: vec![addr],
+                subjects: vec![addr.clone()],
             },
         )
         .unwrap();
 
         let flag: StdResult<Vec<bool>> = from_binary(&res).unwrap();
         assert_eq!(vec![true], flag.unwrap());
+
+        let res = handle(&mut deps, env.clone(), msg.clone());
+        assert_eq!(
+            vec![
+                log("action", "already raised flag"),
+                log("subject", addr.clone())
+            ],
+            res.unwrap().log
+        );
     }
 }
