@@ -3,12 +3,79 @@
   "title": "InitMsg",
   "type": "object",
   "required": [
-    "count"
+    "decimals",
+    "description",
+    "link",
+    "max_submission_value",
+    "min_submission_value",
+    "payment_amount",
+    "timeout",
+    "validator"
   ],
   "properties": {
-    "count": {
+    "decimals": {
+      "description": "The number of decimals to offset the answer by",
       "type": "integer",
-      "format": "int32"
+      "format": "uint8",
+      "minimum": 0.0
+    },
+    "description": {
+      "description": "A short description of what is being reported",
+      "type": "string"
+    },
+    "link": {
+      "description": "LINK token address",
+      "allOf": [
+        {
+          "$ref": "#/definitions/HumanAddr"
+        }
+      ]
+    },
+    "max_submission_value": {
+      "description": "An immutable check for an upper bound of what submission values are accepted from an oracle",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Uint128"
+        }
+      ]
+    },
+    "min_submission_value": {
+      "description": "An immutable check for a lower bound of what submission values are accepted from an oracle",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Uint128"
+        }
+      ]
+    },
+    "payment_amount": {
+      "description": "Amount of LINK paid to each oracle per submission",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Uint128"
+        }
+      ]
+    },
+    "timeout": {
+      "description": "The number of seconds after the previous round that are allowed to lapse before allowing an oracle to skip an unfinished round",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "validator": {
+      "description": "Address to external data validation",
+      "allOf": [
+        {
+          "$ref": "#/definitions/HumanAddr"
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    },
+    "Uint128": {
+      "type": "string"
     }
   }
 }

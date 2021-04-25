@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RoundDetails",
+  "type": "object",
+  "required": [
+    "max_submissions",
+    "min_submissions",
+    "payment_amount",
+    "submissions",
+    "timeout"
+  ],
+  "properties": {
+    "max_submissions": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "min_submissions": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "payment_amount": {
+      "$ref": "#/definitions/Uint128"
+    },
+    "submissions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Uint128"
+      }
+    },
+    "timeout": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    }
+  },
+  "definitions": {
+    "Uint128": {
+      "type": "string"
+    }
+  }
+}

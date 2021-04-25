@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OracleRoundStateResponse",
+  "type": "object",
+  "required": [
+    "available_funds",
+    "elegible_to_submit",
+    "oracle_count",
+    "payment_amount",
+    "round_id",
+    "started_at",
+    "timeout"
+  ],
+  "properties": {
+    "available_funds": {
+      "$ref": "#/definitions/Uint128"
+    },
+    "elegible_to_submit": {
+      "type": "boolean"
+    },
+    "latest_submission": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Uint128"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "oracle_count": {
+      "type": "integer",
+      "format": "uint8",
+      "minimum": 0.0
+    },
+    "payment_amount": {
+      "$ref": "#/definitions/Uint128"
+    },
+    "round_id": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "started_at": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "timeout": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    }
+  },
+  "definitions": {
+    "Uint128": {
+      "type": "string"
+    }
+  }
+}

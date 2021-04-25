@@ -1,7 +1,7 @@
 [package]
-name = "flux-aggregator"
+name = "owned"
 version = "0.1.0"
-authors = ["Milen Radkov <milenradkov@me.com>"]
+authors = ["denis <denismaximov98@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -15,6 +15,8 @@ default = ["singlepass"]
 # for more explicit tests, cargo test --features=backtraces
 backtraces = ["cosmwasm-std/backtraces", "cosmwasm-vm/backtraces"]
 singlepass = ["cosmwasm-vm/default-singlepass"]
+# use library feature to disable all init/handle/query exports
+library = []
 
 [dependencies]
 cosmwasm-std = { version = "0.10.1" }
@@ -22,11 +24,6 @@ cosmwasm-storage = { version = "0.10.1" }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 snafu = { version = "0.6.3" }
-thiserror = { version = "1.0.24" }
-cw20 = { version = "0.2.3" }
-link-token = { path = "../link-token", default-features = false }
-owned = { path = "../owned", default-features = false, features = ["library"] }
-utils = { path = "../utils" }
 
 [dev-dependencies]
 cosmwasm-schema = { version = "0.10.1" }

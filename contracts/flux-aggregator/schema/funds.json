@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Funds",
+  "type": "object",
+  "required": [
+    "allocated",
+    "available"
+  ],
+  "properties": {
+    "allocated": {
+      "$ref": "#/definitions/Uint128"
+    },
+    "available": {
+      "$ref": "#/definitions/Uint128"
+    }
+  },
+  "definitions": {
+    "Uint128": {
+      "type": "string"
+    }
+  }
+}

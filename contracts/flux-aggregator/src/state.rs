@@ -1,7 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use chainlink_contract_utils::modifier::Immutable;
 use cosmwasm_std::{CanonicalAddr, Storage, Uint128};
 use cosmwasm_storage::{
     bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
@@ -9,14 +8,17 @@ use cosmwasm_storage::{
 };
 
 pub static CONFIG_KEY: &[u8] = b"config";
+pub static PREFIX_ORACLES: &[u8] = b"oracles";
 pub static ORACLE_ADDRESSES_KEY: &[u8] = b"oracle_addr";
 pub static RECORDED_FUNDS_KEY: &[u8] = b"recorded_funds";
+pub static PREFIX_REQUESTERS: &[u8] = b"requesters";
 pub static PREFIX_ROUND: &[u8] = b"round";
+pub static PREFIX_DETAILS: &[u8] = b"details";
+pub static LATEST_ROUND_ID_KEY: &[u8] = b"latest_round_id";
+pub static REPORTING_ROUND_ID_KEY: &[u8] = b"reporting_round_id";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
-    pub owner: Immutable<CanonicalAddr>,
-
     pub link: CanonicalAddr,
     pub validator: CanonicalAddr,
 
@@ -28,41 +30,8 @@ pub struct State {
     pub decimals: u8,
     pub description: String,
 
-    min_submission_value: Immutable<String>,
-    max_submission_value: Immutable<String>,
-}
-
-impl State {
-    #[allow(clippy::clippy::too_many_arguments)]
-    pub fn new(
-        owner: CanonicalAddr,
-        link: CanonicalAddr,
-        validator: CanonicalAddr,
-        payment_amount: Uint128,
-        max_submission_count: u32,
-        min_submission_count: u32,
-        restart_delay: u32,
-        timeout: u32,
-        decimals: u8,
-        description: String,
-        min_submission_value: String,
-        max_submission_value: String,
-    ) -> Self {
-        Self {
-            owner: Immutable::new(owner),
-            link,
-            validator,
-            payment_amount,
-            max_submission_count,
-            min_submission_count,
-            restart_delay,
-            timeout,
-            decimals,
-            description,
-            min_submission_value: Immutable::new(min_submission_value),
-            max_submission_value: Immutable::new(max_submission_value),
-        }
-    }
+    pub min_submission_value: Uint128,
+    pub max_submission_value: Uint128,
 }
 
 pub fn config<S: Storage>(storage: &mut S) -> Singleton<S, State> {
@@ -73,6 +42,27 @@ pub fn config_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, State> {
     singleton_read(storage, CONFIG_KEY)
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
+pub struct OracleStatus {
+    pub withdrawable: Uint128,
+    pub starting_round: u32,
+    pub ending_round: u32,
+    pub last_reported_round: Option<u32>,
+    pub last_started_round: Option<u32>,
+    pub latest_submission: Option<Uint128>, // int256
+    pub index: u16,
+    pub admin: CanonicalAddr,
+    pub pending_admin: Option<CanonicalAddr>,
+}
+
+pub fn oracles<S: Storage>(storage: &mut S) -> Bucket<S, OracleStatus> {
+    bucket(&PREFIX_ORACLES, storage)
+}
+
+pub fn oracles_read<S: Storage>(storage: &S) -> ReadonlyBucket<S, OracleStatus> {
+    bucket_read(&PREFIX_ORACLES, storage)
+}
+
 pub fn oracle_addresses<S: Storage>(storage: &mut S) -> Singleton<S, Vec<CanonicalAddr>> {
     singleton(storage, ORACLE_ADDRESSES_KEY)
 }
@@ -81,12 +71,12 @@ pub fn oracle_addresses_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, Ve
     singleton_read(storage, ORACLE_ADDRESSES_KEY)
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 pub struct Round {
-    pub answer: Option<i128>, // int256,
+    pub answer: Option<Uint128>, // int256,
     pub started_at: Option<u64>,
     pub updated_at: Option<u64>,
-    pub answered_in_round: u64,
+    pub answered_in_round: u32,
 }
 
 pub fn rounds<S: Storage>(storage: &mut S) -> Bucket<S, Round> {
@@ -98,18 +88,57 @@ pub fn rounds_read<S: Storage>(storage: &S) -> ReadonlyBucket<S, Round> {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct RoundDetails {
+    pub submissions: Vec<Uint128>, // int256[]
+    pub max_submissions: u32,
+    pub min_submissions: u32,
+    pub timeout: u32,
+    pub payment_amount: Uint128,
+}
+
+pub fn details<S: Storage>(storage: &mut S) -> Bucket<S, RoundDetails> {
+    bucket(&PREFIX_DETAILS, storage)
+}
+
+pub fn details_read<S: Storage>(storage: &S) -> ReadonlyBucket<S, RoundDetails> {
+    bucket_read(&PREFIX_DETAILS, storage)
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
+pub struct Requester {
+    pub authorized: bool,
+    pub delay: u32,
+    pub last_started_round: u32,
+}
+
+pub fn requesters<S: Storage>(storage: &mut S) -> Bucket<S, Requester> {
+    bucket(&PREFIX_REQUESTERS, storage)
+}
+
+pub fn requesters_read<S: Storage>(storage: &S) -> ReadonlyBucket<S, Requester> {
+    bucket_read(&PREFIX_REQUESTERS, storage)
+}
+
+pub fn reporting_round_id<S: Storage>(storage: &mut S) -> Singleton<S, u32> {
+    singleton(storage, REPORTING_ROUND_ID_KEY)
+}
+
+pub fn reporting_round_id_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, u32> {
+    singleton_read(storage, REPORTING_ROUND_ID_KEY)
+}
+
+pub fn latest_round_id<S: Storage>(storage: &mut S) -> Singleton<S, u32> {
+    singleton(storage, LATEST_ROUND_ID_KEY)
+}
+
+pub fn latest_round_id_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, u32> {
+    singleton_read(storage, LATEST_ROUND_ID_KEY)
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 pub struct Funds {
     pub available: Uint128,
     pub allocated: Uint128,
-}
-
-impl Default for Funds {
-    fn default() -> Self {
-        Self {
-            available: Uint128::zero(),
-            allocated: Uint128::zero(),
-        }
-    }
 }
 
 pub fn recorded_funds<S: Storage>(storage: &mut S) -> Singleton<S, Funds> {
