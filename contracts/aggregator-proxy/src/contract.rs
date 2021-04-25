@@ -1,22 +1,38 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, Env, Extern, HandleResponse, InitResponse, Querier, StdError,
-    StdResult, Storage,
+    to_binary, Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr, InitResponse,
+    Querier, StdError, StdResult, Storage, Uint128,
+};
+use owned::{
+    contract::{get_owner, handle_accept_ownership, handle_transfer_ownership, init as owned_init},
+    state::owner_read,
 };
 
-use crate::msg::{CountResponse, HandleMsg, InitMsg, QueryMsg};
-use crate::state::{config, config_read, State};
+use crate::{
+    msg::{HandleMsg, InitMsg, QueryMsg},
+    state::{
+        current_phase, current_phase_read, phase_aggregators, proposed_aggregator,
+        proposed_aggregator_read, set_phase_aggregator, Phase,
+    },
+};
+
+static PHASE_OFFSET: Uint128 = Uint128(64);
+static PHASE_SIZE: Uint128 = Uint128(16);
+static MAX_ID: Uint128 = Uint128(2_u128.pow(80) - 1);
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let state = State {
-        count: msg.count,
-        owner: deps.api.canonical_address(&env.message.sender)?,
-    };
+    owned_init(deps, env, owned::msg::InitMsg {})?;
 
-    config(&mut deps.storage).save(&state)?;
+    let aggregator_addr = deps.api.canonical_address(&msg.aggregator)?;
+
+    set_phase_aggregator(&mut deps.storage, 1, &aggregator_addr)?;
+    current_phase(&mut deps.storage).save(&Phase {
+        id: 1,
+        aggregator_addr,
+    })?;
 
     Ok(InitResponse::default())
 }
@@ -27,36 +43,60 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
-        HandleMsg::Increment {} => try_increment(deps, env),
-        HandleMsg::Reset { count } => try_reset(deps, env, count),
+        HandleMsg::ProposeAggregator { aggregator } => {
+            handle_propose_aggregator(deps, env, aggregator)
+        }
+        HandleMsg::ConfirmAggregator { aggregator } => {
+            handle_confirm_aggregator(deps, env, aggregator)
+        }
+        HandleMsg::TransferOwnership { to } => handle_transfer_ownership(deps, env, to),
+        HandleMsg::AcceptOwnership {} => handle_accept_ownership(deps, env),
     }
 }
 
-pub fn try_increment<S: Storage, A: Api, Q: Querier>(
+pub fn handle_propose_aggregator<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    _env: Env,
+    env: Env,
+    aggregator: HumanAddr,
 ) -> StdResult<HandleResponse> {
-    config(&mut deps.storage).update(|mut state| {
-        state.count += 1;
-        Ok(state)
-    })?;
+    let sender = deps.api.canonical_address(&env.message.sender)?;
+    if sender != owner_read(&deps.storage).load()?.owner {
+        return Err(StdError::generic_err("Not owner"));
+    }
+
+    let aggregator_addr = deps.api.canonical_address(&aggregator)?;
+    proposed_aggregator(&mut deps.storage).save(&aggregator_addr)?;
 
     Ok(HandleResponse::default())
 }
 
-pub fn try_reset<S: Storage, A: Api, Q: Querier>(
+pub fn handle_confirm_aggregator<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    count: i32,
+    aggregator: HumanAddr,
 ) -> StdResult<HandleResponse> {
-    let api = &deps.api;
-    config(&mut deps.storage).update(|mut state| {
-        if api.canonical_address(&env.message.sender)? != state.owner {
-            return Err(StdError::unauthorized());
-        }
-        state.count = count;
-        Ok(state)
+    let sender = deps.api.canonical_address(&env.message.sender)?;
+    if sender != owner_read(&deps.storage).load()?.owner {
+        return Err(StdError::generic_err("Not owner"));
+    }
+    let aggregator_addr = deps.api.canonical_address(&aggregator)?;
+    let proposed = proposed_aggregator_read(&deps.storage)
+        .may_load()?
+        .ok_or(StdError::generic_err("Invalid proposed aggregator"))?;
+    if proposed != aggregator_addr {
+        return Err(StdError::generic_err("Invalid proposed aggregator"));
+    }
+
+    proposed_aggregator(&mut deps.storage).remove();
+
+    let phase = current_phase(&mut deps.storage).load()?;
+    let new_id = phase.id + 1;
+    set_phase_aggregator(&mut deps.storage, new_id, &aggregator_addr)?;
+    current_phase(&mut deps.storage).save(&Phase {
+        id: new_id,
+        aggregator_addr,
     })?;
+
     Ok(HandleResponse::default())
 }
 
@@ -65,82 +105,19 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
+        QueryMsg::GetRoundData { round_id } => todo!(),
+        QueryMsg::GetLatestRoundData {} => todo!(),
+        QueryMsg::GetProposedRoundData { round_id } => todo!(),
+        QueryMsg::GetProposedLatestRoundData {} => todo!(),
+        QueryMsg::GetProposedAggregator {} => todo!(),
+        QueryMsg::GetPhase {} => todo!(),
+        QueryMsg::GetDecimals {} => todo!(),
+        QueryMsg::GetDescription {} => todo!(),
+        QueryMsg::GetOwner {} => to_binary(&get_owner(deps)),
     }
 }
 
-fn query_count<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<CountResponse> {
-    let state = config_read(&deps.storage).load()?;
-    Ok(CountResponse { count: state.count })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, from_binary, StdError};
-
-    #[test]
-    fn proper_initialization() {
-        let mut deps = mock_dependencies(20, &[]);
-
-        let msg = InitMsg { count: 17 };
-        let env = mock_env("creator", &coins(1000, "earth"));
-
-        // we can just call .unwrap() to assert this was a success
-        let res = init(&mut deps, env, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // it worked, let's query the state
-        let res = query(&deps, QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(17, value.count);
-    }
-
-    #[test]
-    fn increment() {
-        let mut deps = mock_dependencies(20, &coins(2, "token"));
-
-        let msg = InitMsg { count: 17 };
-        let env = mock_env("creator", &coins(2, "token"));
-        let _res = init(&mut deps, env, msg).unwrap();
-
-        // beneficiary can release it
-        let env = mock_env("anyone", &coins(2, "token"));
-        let msg = HandleMsg::Increment {};
-        let _res = handle(&mut deps, env, msg).unwrap();
-
-        // should increase counter by 1
-        let res = query(&deps, QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(18, value.count);
-    }
-
-    #[test]
-    fn reset() {
-        let mut deps = mock_dependencies(20, &coins(2, "token"));
-
-        let msg = InitMsg { count: 17 };
-        let env = mock_env("creator", &coins(2, "token"));
-        let _res = init(&mut deps, env, msg).unwrap();
-
-        // beneficiary can release it
-        let unauth_env = mock_env("anyone", &coins(2, "token"));
-        let msg = HandleMsg::Reset { count: 5 };
-        let res = handle(&mut deps, unauth_env, msg);
-        match res {
-            Err(StdError::Unauthorized { .. }) => {}
-            _ => panic!("Must return unauthorized error"),
-        }
-
-        // only the original creator can reset the counter
-        let auth_env = mock_env("creator", &coins(2, "token"));
-        let msg = HandleMsg::Reset { count: 5 };
-        let _res = handle(&mut deps, auth_env, msg).unwrap();
-
-        // should now be 5
-        let res = query(&deps, QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(5, value.count);
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+// }

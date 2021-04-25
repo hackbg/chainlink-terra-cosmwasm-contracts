@@ -49,6 +49,8 @@ dependencies = [
  "cosmwasm-std",
  "cosmwasm-storage",
  "cosmwasm-vm",
+ "flux-aggregator",
+ "owned",
  "schemars",
  "serde",
  "snafu",
