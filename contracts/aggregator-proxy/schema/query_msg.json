@@ -5,10 +5,129 @@
     {
       "type": "object",
       "required": [
-        "get_count"
+        "get_round_data"
       ],
       "properties": {
-        "get_count": {
+        "get_round_data": {
+          "type": "object",
+          "required": [
+            "round_id"
+          ],
+          "properties": {
+            "round_id": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_latest_round_data"
+      ],
+      "properties": {
+        "get_latest_round_data": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_proposed_round_data"
+      ],
+      "properties": {
+        "get_proposed_round_data": {
+          "type": "object",
+          "required": [
+            "round_id"
+          ],
+          "properties": {
+            "round_id": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_proposed_latest_round_data"
+      ],
+      "properties": {
+        "get_proposed_latest_round_data": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_proposed_aggregator"
+      ],
+      "properties": {
+        "get_proposed_aggregator": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_aggregator"
+      ],
+      "properties": {
+        "get_aggregator": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_phase_id"
+      ],
+      "properties": {
+        "get_phase_id": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_decimals"
+      ],
+      "properties": {
+        "get_decimals": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_description"
+      ],
+      "properties": {
+        "get_description": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_owner"
+      ],
+      "properties": {
+        "get_owner": {
           "type": "object"
         }
       }

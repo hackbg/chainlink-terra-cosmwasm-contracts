@@ -1,4 +1,4 @@
-use cosmwasm_std::{CanonicalAddr, HumanAddr, Uint128};
+use cosmwasm_std::{CanonicalAddr, HumanAddr};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -20,12 +20,13 @@ pub enum HandleMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    GetRoundData { round_id: Uint128 },
+    GetRoundData { round_id: u32 },
     GetLatestRoundData {},
-    GetProposedRoundData { round_id: Uint128 },
+    GetProposedRoundData { round_id: u32 },
     GetProposedLatestRoundData {},
     GetProposedAggregator {},
-    GetPhase {},
+    GetAggregator {},
+    GetPhaseId {},
     GetDecimals {},
     GetDescription {},
     // owned

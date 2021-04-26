@@ -5,33 +5,82 @@
     {
       "type": "object",
       "required": [
-        "increment"
+        "propose_aggregator"
       ],
       "properties": {
-        "increment": {
-          "type": "object"
+        "propose_aggregator": {
+          "type": "object",
+          "required": [
+            "aggregator"
+          ],
+          "properties": {
+            "aggregator": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
         }
       }
     },
     {
       "type": "object",
       "required": [
-        "reset"
+        "confirm_aggregator"
       ],
       "properties": {
-        "reset": {
+        "confirm_aggregator": {
           "type": "object",
           "required": [
-            "count"
+            "aggregator"
           ],
           "properties": {
-            "count": {
-              "type": "integer",
-              "format": "int32"
+            "aggregator": {
+              "$ref": "#/definitions/HumanAddr"
             }
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "required": [
+        "transfer_ownership"
+      ],
+      "properties": {
+        "transfer_ownership": {
+          "type": "object",
+          "required": [
+            "to"
+          ],
+          "properties": {
+            "to": {
+              "$ref": "#/definitions/CanonicalAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "accept_ownership"
+      ],
+      "properties": {
+        "accept_ownership": {
+          "type": "object"
+        }
+      }
     }
-  ]
+  ],
+  "definitions": {
+    "Binary": {
+      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
+      "type": "string"
+    },
+    "CanonicalAddr": {
+      "$ref": "#/definitions/Binary"
+    },
+    "HumanAddr": {
+      "type": "string"
+    }
+  }
 }

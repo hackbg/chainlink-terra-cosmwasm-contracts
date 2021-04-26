@@ -3,12 +3,16 @@
   "title": "InitMsg",
   "type": "object",
   "required": [
-    "count"
+    "aggregator"
   ],
   "properties": {
-    "count": {
-      "type": "integer",
-      "format": "int32"
+    "aggregator": {
+      "$ref": "#/definitions/HumanAddr"
+    }
+  },
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
     }
   }
 }
