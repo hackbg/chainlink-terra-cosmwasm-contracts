@@ -3,11 +3,11 @@
   "title": "State",
   "type": "object",
   "required": [
-    "flagging_treshold",
+    "flagging_threshold",
     "flags"
   ],
   "properties": {
-    "flagging_treshold": {
+    "flagging_threshold": {
       "type": "integer",
       "format": "uint32",
       "minimum": 0.0

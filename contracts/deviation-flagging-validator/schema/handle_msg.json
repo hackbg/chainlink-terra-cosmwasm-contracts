@@ -5,16 +5,16 @@
     {
       "type": "object",
       "required": [
-        "set_flagging_treshold"
+        "set_flagging_threshold"
       ],
       "properties": {
-        "set_flagging_treshold": {
+        "set_flagging_threshold": {
           "type": "object",
           "required": [
-            "treshold"
+            "threshold"
           ],
           "properties": {
-            "treshold": {
+            "threshold": {
               "type": "integer",
               "format": "uint32",
               "minimum": 0.0
@@ -36,7 +36,38 @@
           ],
           "properties": {
             "flags": {
-              "$ref": "#/definitions/CanonicalAddr"
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "validate"
+      ],
+      "properties": {
+        "validate": {
+          "type": "object",
+          "required": [
+            "answer",
+            "previous_answer",
+            "previous_round_id",
+            "round_id"
+          ],
+          "properties": {
+            "answer": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "previous_answer": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "previous_round_id": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "round_id": {
+              "$ref": "#/definitions/Uint128"
             }
           }
         }
@@ -44,12 +75,11 @@
     }
   ],
   "definitions": {
-    "Binary": {
-      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
+    "HumanAddr": {
       "type": "string"
     },
-    "CanonicalAddr": {
-      "$ref": "#/definitions/Binary"
+    "Uint128": {
+      "type": "string"
     }
   }
 }

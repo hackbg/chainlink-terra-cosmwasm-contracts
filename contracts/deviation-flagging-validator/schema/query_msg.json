@@ -5,24 +5,30 @@
     {
       "type": "object",
       "required": [
-        "validate"
-      ],
-      "properties": {
-        "validate": {
-          "type": "object"
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
         "is_valid"
       ],
       "properties": {
         "is_valid": {
-          "type": "object"
+          "type": "object",
+          "required": [
+            "answer",
+            "previous_answer"
+          ],
+          "properties": {
+            "answer": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "previous_answer": {
+              "$ref": "#/definitions/Uint128"
+            }
+          }
         }
       }
     }
-  ]
+  ],
+  "definitions": {
+    "Uint128": {
+      "type": "string"
+    }
+  }
 }
