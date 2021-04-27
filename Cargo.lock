@@ -309,9 +309,13 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
+ "cosmwasm-vm",
+ "flags",
+ "owned",
  "schemars",
  "serde",
  "snafu",
+ "thiserror",
 ]
 
 [[package]]
