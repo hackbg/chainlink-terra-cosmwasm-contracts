@@ -66,6 +66,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
             previous_answer,
             answer,
         } => to_binary(&is_valid(&deps, previous_answer, answer)),
+        QueryMsg::GetFlaggingThreshold {} => to_binary(&query_flagging_threshold(&deps)),
     }
 }
 
@@ -89,14 +90,14 @@ pub fn handle_validate<S: Storage, A: Api, Q: Querier>(
         };
         Ok(HandleResponse {
             messages: vec![raise_flag_msg.into()],
-            log: vec![],
-            data: None,
+            log: vec![log("action", "validate"), log("is valid", false)],
+            data: Some(to_binary(&false)?),
         })
     } else {
         Ok(HandleResponse {
             messages: vec![],
-            log: vec![],
-            data: None,
+            log: vec![log("action", "validate"), log("is valid", true)],
+            data: Some(to_binary(&true)?),
         })
     }
 }
@@ -119,7 +120,11 @@ pub fn handle_set_flags_address<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![],
+        log: vec![
+            log("action", "flags address updated"),
+            log("previous", deps.api.human_address(&previous)?),
+            log("current", deps.api.human_address(&new_addr)?),
+        ],
         data: None,
     })
 }
@@ -141,7 +146,11 @@ pub fn handle_set_flagging_threshold<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![],
+        log: vec![
+            log("action", "flagging threshold updated"),
+            log("previous", previous_ft),
+            log("current", threshold),
+        ],
         data: None,
     })
 }
@@ -162,6 +171,13 @@ fn is_valid<S: Storage, A: Api, Q: Querier>(
     }
 }
 
+pub fn query_flagging_threshold<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<u32> {
+    let flagging_threshold = config_read(&deps.storage).load()?.flagging_threshold;
+    Ok(flagging_threshold)
+}
+
 fn validate_ownership<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     env: &Env,
@@ -177,7 +193,7 @@ fn validate_ownership<S: Storage, A: Api, Q: Querier>(
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, from_binary, StdError};
+    use cosmwasm_std::{coins, from_binary};
 
     #[test]
     fn proper_initialization() {
@@ -204,7 +220,145 @@ mod tests {
         };
         let env = mock_env("creator", &coins(1000, "earth"));
 
+        let res = init(&mut deps, env.clone(), msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let msg = HandleMsg::SetFlagsAddress {
+            flags: HumanAddr::from("new_flags"),
+        };
+        let res = handle(&mut deps, env.clone(), msg.clone()).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let flag_addr = deps
+            .api
+            .human_address(&config_read(&deps.storage).load().unwrap().flags)
+            .unwrap();
+        assert_eq!(HumanAddr::from("new_flags"), flag_addr);
+    }
+
+    #[test]
+    fn setting_threshold() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let msg = InitMsg {
+            flags: HumanAddr::from("flags"),
+            flagging_threshold: 100000,
+        };
+        let env = mock_env("creator", &coins(1000, "earth"));
+
+        let res = init(&mut deps, env.clone(), msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let msg = HandleMsg::SetFlaggingThreshold { threshold: 1000 };
+        let res = handle(&mut deps, env.clone(), msg.clone()).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let threshold = &config_read(&deps.storage)
+            .load()
+            .unwrap()
+            .flagging_threshold;
+        assert_eq!(1000, *threshold);
+    }
+
+    #[test]
+    fn is_valid_gives_right_response() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let msg = InitMsg {
+            flags: HumanAddr::from("flags"),
+            flagging_threshold: 80000,
+        };
+
+        let env = mock_env("creator", &coins(1000, "earth"));
         let res = init(&mut deps, env, msg).unwrap();
         assert_eq!(0, res.messages.len());
+
+        // this input should return false
+        let msg = QueryMsg::IsValid {
+            previous_answer: Uint128::from(100 as u64),
+            answer: Uint128::from(5 as u64),
+        };
+        let res = query(&deps, msg).unwrap();
+        let is_valid: StdResult<bool> = from_binary(&res).unwrap();
+        assert_eq!(false, is_valid.unwrap());
+
+        // this input should return true
+        let msg = QueryMsg::IsValid {
+            previous_answer: Uint128::from(3 as u64),
+            answer: Uint128::from(1 as u64),
+        };
+        let res = query(&deps, msg).unwrap();
+        let is_valid: StdResult<bool> = from_binary(&res).unwrap();
+        assert_eq!(true, is_valid.unwrap());
+
+        // should return true if previous_answer is 0
+        let msg = QueryMsg::IsValid {
+            previous_answer: Uint128::zero(),
+            answer: Uint128::from(5 as u64),
+        };
+        let res = query(&deps, msg).unwrap();
+        let is_valid: StdResult<bool> = from_binary(&res).unwrap();
+        assert_eq!(true, is_valid.unwrap());
+    }
+
+    #[test]
+    fn validate() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let msg = InitMsg {
+            flags: HumanAddr::from("flags"),
+            flagging_threshold: 80000,
+        };
+
+        let env = mock_env("creator", &coins(1000, "earth"));
+
+        let res = init(&mut deps, env.clone(), msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let msg = HandleMsg::Validate {
+            previous_round_id: Uint128::from(2 as u64),
+            previous_answer: Uint128::from(3 as u64),
+            answer: Uint128::from(1 as u64),
+            round_id: Uint128::from(3 as u64),
+        };
+
+        // the case if validate is true
+        let res = handle(&mut deps, env.clone(), msg).unwrap();
+        assert_eq!(
+            vec![log("action", "validate"), log("is valid", true)],
+            res.log
+        );
+
+        let msg = HandleMsg::Validate {
+            previous_round_id: Uint128::from(2 as u64),
+            previous_answer: Uint128::from(100 as u64),
+            answer: Uint128::from(5 as u64),
+            round_id: Uint128::from(3 as u64),
+        };
+        let res = handle(&mut deps, env.clone(), msg).unwrap();
+        assert_eq!(
+            vec![log("action", "validate"), log("is valid", false)],
+            res.log
+        );
+    }
+
+    #[test]
+    fn query_flagging_threshold() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let msg = InitMsg {
+            flags: HumanAddr::from("flags"),
+            flagging_threshold: 80000,
+        };
+
+        let env = mock_env("creator", &coins(1000, "earth"));
+
+        let res = init(&mut deps, env.clone(), msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let msg = QueryMsg::GetFlaggingThreshold {};
+        let res = query(&deps, msg).unwrap();
+        let flagging_threshold: StdResult<u32> = from_binary(&res).unwrap();
+        assert_eq!(80000 as u32, flagging_threshold.unwrap());
     }
 }

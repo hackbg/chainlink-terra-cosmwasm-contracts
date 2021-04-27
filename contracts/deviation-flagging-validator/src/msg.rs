@@ -32,4 +32,5 @@ pub enum QueryMsg {
         previous_answer: Uint128,
         answer: Uint128,
     },
+    GetFlaggingThreshold {},
 }
