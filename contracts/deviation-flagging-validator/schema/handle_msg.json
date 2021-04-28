@@ -3,6 +3,44 @@
   "title": "HandleMsg",
   "anyOf": [
     {
+      "description": "Initiate contract ownership transfer to another address. Can be used only by owner",
+      "type": "object",
+      "required": [
+        "transfer_ownership"
+      ],
+      "properties": {
+        "transfer_ownership": {
+          "type": "object",
+          "required": [
+            "to"
+          ],
+          "properties": {
+            "to": {
+              "description": "Address to transfer ownership to",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Finish contract ownership transfer. Can be used only by pending owner",
+      "type": "object",
+      "required": [
+        "accept_ownership"
+      ],
+      "properties": {
+        "accept_ownership": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Upates the flagging threshold Can be used only by owner",
       "type": "object",
       "required": [
         "set_flagging_threshold"
@@ -24,6 +62,7 @@
       }
     },
     {
+      "description": "Updates the flagging contract address for raising flags Can be used only by owner",
       "type": "object",
       "required": [
         "set_flags_address"
@@ -43,6 +82,7 @@
       }
     },
     {
+      "description": "Checks whether the parameters count as valid by comparing the difference change to the flagging threshold",
       "type": "object",
       "required": [
         "validate"
@@ -58,16 +98,32 @@
           ],
           "properties": {
             "answer": {
-              "$ref": "#/definitions/Uint128"
+              "description": "Current answer which is compared for a ration of change to make sure it has not exceeded the flagging threshold",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
             },
             "previous_answer": {
-              "$ref": "#/definitions/Uint128"
+              "description": "Previous answer, used as the median of difference with the current answer to determine if the deviation threshold has been exceeded",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
             },
             "previous_round_id": {
-              "$ref": "#/definitions/Uint128"
+              "description": "ID of the previous round",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
             },
             "round_id": {
-              "$ref": "#/definitions/Uint128"
+              "description": "ID of the current round",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
             }
           }
         }

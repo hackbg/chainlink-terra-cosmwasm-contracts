@@ -8,7 +8,7 @@ use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::state::{config, config_read, State};
 
 use flags::msg::HandleMsg as FlagsMsg;
-use owned::contract::{get_owner, init as owned_init};
+use owned::contract::{get_owner, handle_accept_ownership, init as owned_init};
 
 static THRESHOLD_MULTIPLIER: u128 = 100000;
 
@@ -54,6 +54,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             round_id,
             answer,
         ),
+        HandleMsg::TransferOwnership { to } => handle_transfer_ownership(deps, env, to),
+        HandleMsg::AcceptOwnership {} => handle_accept_ownership(deps, env),
     }
 }
 
@@ -67,15 +69,16 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
             answer,
         } => to_binary(&is_valid(&deps, previous_answer, answer)),
         QueryMsg::GetFlaggingThreshold {} => to_binary(&query_flagging_threshold(&deps)),
+        QueryMsg::GetOwner {} => to_binary(&get_owner(deps)),
     }
 }
 
 pub fn handle_validate<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    _previous_round_id: Uint128,
+    _previous_round_id: u32,
     previous_answer: Uint128,
-    _round_id: Uint128,
+    _round_id: u32,
     answer: Uint128,
 ) -> StdResult<HandleResponse> {
     if !(is_valid(deps, previous_answer, answer)?) {
@@ -153,6 +156,15 @@ pub fn handle_set_flagging_threshold<S: Storage, A: Api, Q: Querier>(
         ],
         data: None,
     })
+}
+
+pub fn handle_transfer_ownership<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    to: HumanAddr,
+) -> StdResult<HandleResponse> {
+    let to = deps.api.canonical_address(&to)?;
+    owned::contract::handle_transfer_ownership(deps, env, to)
 }
 
 fn is_valid<S: Storage, A: Api, Q: Querier>(
@@ -316,10 +328,10 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         let msg = HandleMsg::Validate {
-            previous_round_id: Uint128::from(2 as u64),
+            previous_round_id: 2,
             previous_answer: Uint128::from(3 as u64),
             answer: Uint128::from(1 as u64),
-            round_id: Uint128::from(3 as u64),
+            round_id: 3,
         };
 
         // the case if validate is true
@@ -330,10 +342,10 @@ mod tests {
         );
 
         let msg = HandleMsg::Validate {
-            previous_round_id: Uint128::from(2 as u64),
+            previous_round_id: 2,
             previous_answer: Uint128::from(100 as u64),
             answer: Uint128::from(5 as u64),
-            round_id: Uint128::from(3 as u64),
+            round_id: 3,
         };
         let res = handle(&mut deps, env.clone(), msg).unwrap();
         assert_eq!(
