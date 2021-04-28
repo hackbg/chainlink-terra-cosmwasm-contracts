@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HandleMsg",
+  "anyOf": [
+    {
+      "description": "Initiate contract ownership transfer to another address. Can be used only by owner",
+      "type": "object",
+      "required": [
+        "transfer_ownership"
+      ],
+      "properties": {
+        "transfer_ownership": {
+          "type": "object",
+          "required": [
+            "to"
+          ],
+          "properties": {
+            "to": {
+              "description": "Address to transfer ownership to",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Finish contract ownership transfer. Can be used only by pending owner",
+      "type": "object",
+      "required": [
+        "accept_ownership"
+      ],
+      "properties": {
+        "accept_ownership": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Upates the flagging threshold Can be used only by owner",
+      "type": "object",
+      "required": [
+        "set_flagging_threshold"
+      ],
+      "properties": {
+        "set_flagging_threshold": {
+          "type": "object",
+          "required": [
+            "threshold"
+          ],
+          "properties": {
+            "threshold": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Updates the flagging contract address for raising flags Can be used only by owner",
+      "type": "object",
+      "required": [
+        "set_flags_address"
+      ],
+      "properties": {
+        "set_flags_address": {
+          "type": "object",
+          "required": [
+            "flags"
+          ],
+          "properties": {
+            "flags": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Checks whether the parameters count as valid by comparing the difference change to the flagging threshold",
+      "type": "object",
+      "required": [
+        "validate"
+      ],
+      "properties": {
+        "validate": {
+          "type": "object",
+          "required": [
+            "answer",
+            "previous_answer",
+            "previous_round_id",
+            "round_id"
+          ],
+          "properties": {
+            "answer": {
+              "description": "Current answer which is compared for a ration of change to make sure it has not exceeded the flagging threshold",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            },
+            "previous_answer": {
+              "description": "Previous answer, used as the median of difference with the current answer to determine if the deviation threshold has been exceeded",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            },
+            "previous_round_id": {
+              "description": "ID of the previous round",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "round_id": {
+              "description": "ID of the current round",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    },
+    "Uint128": {
+      "type": "string"
+    }
+  }
+}

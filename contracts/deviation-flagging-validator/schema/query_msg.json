@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QueryMsg",
+  "anyOf": [
+    {
+      "description": "Check whethere the parameters count is valid by comparing the difference change to the flagging threshold Response: [`bool`]",
+      "type": "object",
+      "required": [
+        "is_valid"
+      ],
+      "properties": {
+        "is_valid": {
+          "type": "object",
+          "required": [
+            "answer",
+            "previous_answer"
+          ],
+          "properties": {
+            "answer": {
+              "description": "Current answer which is compared for a ration of change to make sure it has not exceeded the flagging threshold",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            },
+            "previous_answer": {
+              "description": "Previous answer, used as the median of difference with the current answer to determine if the deviation threshold has been exceeded",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Query the flagging threshold Response: [`u32`]",
+      "type": "object",
+      "required": [
+        "get_flagging_threshold"
+      ],
+      "properties": {
+        "get_flagging_threshold": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Returns contract owner's address Response [`HumanAddr`]",
+      "type": "object",
+      "required": [
+        "get_owner"
+      ],
+      "properties": {
+        "get_owner": {
+          "type": "object"
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "Uint128": {
+      "type": "string"
+    }
+  }
+}
