@@ -9,7 +9,7 @@ pub enum ContractErr {
     #[error("No Access")]
     NoAccess,
     #[error("Cannot callback to LINK")]
-    BadCallback
+    BadCallback,
 }
 
 impl ContractErr {

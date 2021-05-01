@@ -42,7 +42,7 @@ pub enum HandleMsg {
         payment: Uint128,
         /// The callback address for fulfillment
         callback_address: HumanAddr,
-        /// The callback function ID for fulfillment 
+        /// The callback function ID for fulfillment
         callback_function_id: Binary,
         /// the expiration that the node should respond by before the requester can cancel
         expiration: Uint128,
@@ -81,9 +81,9 @@ pub enum HandleMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /// Check if a node is authorized for fulfilling requests
-    GetAuthorizationStatus { 
+    GetAuthorizationStatus {
         /// The address of the Chainlink node
-        node: HumanAddr 
+        node: HumanAddr,
     },
     /// Displays the amount of LINK that is available for the node operator to withdraw
     Withdrawable {},
