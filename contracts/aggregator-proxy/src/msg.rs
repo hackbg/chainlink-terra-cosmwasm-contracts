@@ -2,6 +2,8 @@ use cosmwasm_std::{CanonicalAddr, HumanAddr};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+pub type PhaseAggregators = Vec<(u16, HumanAddr)>;
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
     pub aggregator: HumanAddr,
@@ -20,6 +22,7 @@ pub enum HandleMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
+    GetPhaseAggregators {},
     GetRoundData { round_id: u32 },
     GetLatestRoundData {},
     GetProposedRoundData { round_id: u32 },

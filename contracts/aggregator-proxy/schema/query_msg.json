@@ -5,6 +5,17 @@
     {
       "type": "object",
       "required": [
+        "get_phase_aggregators"
+      ],
+      "properties": {
+        "get_phase_aggregators": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
         "get_round_data"
       ],
       "properties": {

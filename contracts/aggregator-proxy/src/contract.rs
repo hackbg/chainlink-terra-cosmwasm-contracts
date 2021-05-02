@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use cosmwasm_std::{
     to_binary, Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr, InitResponse,
-    Querier, QueryRequest, StdError, StdResult, Storage, Uint128, WasmQuery,
+    Order, Querier, QueryRequest, StdError, StdResult, Storage, Uint128, WasmQuery,
 };
 use flux_aggregator::msg::{ConfigResponse, QueryMsg as AggregatorQueryMsg, RoundDataResponse};
 use owned::{
@@ -11,10 +11,10 @@ use owned::{
 };
 
 use crate::{
-    msg::{HandleMsg, InitMsg, QueryMsg},
+    msg::{HandleMsg, InitMsg, PhaseAggregators, QueryMsg},
     state::{
-        current_phase, current_phase_read, get_phase_aggregator, proposed_aggregator,
-        proposed_aggregator_read, set_phase_aggregator, Phase,
+        current_phase, current_phase_read, get_phase_aggregator, phase_aggregators_read,
+        proposed_aggregator, proposed_aggregator_read, set_phase_aggregator, Phase,
     },
 };
 
@@ -106,6 +106,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
+        QueryMsg::GetPhaseAggregators {} => to_binary(&get_phase_aggregators(deps)),
         QueryMsg::GetRoundData { round_id } => to_binary(&get_round_data(deps, round_id)),
         QueryMsg::GetLatestRoundData {} => to_binary(&get_latest_round_data(deps)),
         QueryMsg::GetProposedRoundData { round_id } => {
@@ -134,6 +135,22 @@ macro_rules! query {
         let res: StdResult<$ret> = $deps.querier.custom_query(&query)?;
         res
     }};
+}
+
+pub fn get_phase_aggregators<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<PhaseAggregators> {
+    phase_aggregators_read(&deps.storage)
+        .range(None, None, Order::Ascending)
+        .map(|entry| {
+            entry.and_then(|aggregator| {
+                Ok((
+                    u16::from_be_bytes(aggregator.0.as_slice().try_into().unwrap()),
+                    deps.api.human_address(&aggregator.1)?,
+                ))
+            })
+        })
+        .collect()
 }
 
 pub fn get_round_data<S: Storage, A: Api, Q: Querier>(
