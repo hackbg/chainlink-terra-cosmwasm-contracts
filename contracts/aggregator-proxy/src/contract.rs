@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use cosmwasm_std::{
     to_binary, Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr, InitResponse,
     Querier, QueryRequest, StdError, StdResult, Storage, Uint128, WasmQuery,
@@ -11,14 +13,12 @@ use owned::{
 use crate::{
     msg::{HandleMsg, InitMsg, QueryMsg},
     state::{
-        current_phase, current_phase_read, proposed_aggregator, proposed_aggregator_read,
-        set_phase_aggregator, Phase,
+        current_phase, current_phase_read, get_phase_aggregator, proposed_aggregator,
+        proposed_aggregator_read, set_phase_aggregator, Phase,
     },
 };
 
-static _PHASE_OFFSET: Uint128 = Uint128(64);
-static _PHASE_SIZE: Uint128 = Uint128(16);
-static _MAX_ID: Uint128 = Uint128(2_u128.pow(80) - 1);
+static PHASE_OFFSET: Uint128 = Uint128(64);
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
@@ -137,16 +137,26 @@ macro_rules! query {
 }
 
 pub fn get_round_data<S: Storage, A: Api, Q: Querier>(
-    _deps: &Extern<S, A, Q>,
-    _round_id: u32,
+    deps: &Extern<S, A, Q>,
+    round_id: u32,
 ) -> StdResult<RoundDataResponse> {
-    todo!()
+    let phase_id = (round_id >> PHASE_OFFSET.u128())
+        .try_into()
+        .map_err(|_| StdError::generic_err("Failed parse"))?;
+    let aggregator = get_phase_aggregator(&deps.storage, phase_id)?;
+    let res = query!(deps, aggregator, GetRoundData round_id => RoundDataResponse)?;
+    Ok(add_phase_ids(res, phase_id))
 }
 
 pub fn get_latest_round_data<S: Storage, A: Api, Q: Querier>(
-    _deps: &Extern<S, A, Q>,
+    deps: &Extern<S, A, Q>,
 ) -> StdResult<RoundDataResponse> {
-    todo!()
+    let Phase {
+        aggregator_addr,
+        id,
+    } = current_phase_read(&deps.storage).load()?;
+    let res = query!(deps, aggregator_addr, GetLatestRoundData => RoundDataResponse)?;
+    Ok(add_phase_ids(res, id))
 }
 
 pub fn get_proposed_round_data<S: Storage, A: Api, Q: Querier>(
@@ -202,6 +212,20 @@ fn get_proposed<S: Storage>(storage: &S) -> StdResult<CanonicalAddr> {
     proposed_aggregator_read(storage)
         .may_load()?
         .ok_or_else(|| StdError::generic_err("No proposed aggregator present"))
+}
+
+fn add_phase_ids(round_data: RoundDataResponse, phase_id: u16) -> RoundDataResponse {
+    RoundDataResponse {
+        round_id: add_phase(phase_id, round_data.round_id),
+        answer: round_data.answer,
+        started_at: round_data.started_at,
+        updated_at: round_data.updated_at,
+        answered_in_round: add_phase(phase_id, round_data.answered_in_round),
+    }
+}
+
+fn add_phase(phase: u16, original_id: u32) -> u32 {
+    (phase as u32) << PHASE_OFFSET.u128() | original_id
 }
 
 // #[cfg(test)]
