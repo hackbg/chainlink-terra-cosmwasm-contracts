@@ -10,6 +10,8 @@ pub enum ContractErr {
     NoAccess,
     #[error("Cannot callback to LINK")]
     BadCallback,
+    #[error("Amount requested is greater than withdrawable balance")]
+    NotEnoughFunds,
 }
 
 impl ContractErr {

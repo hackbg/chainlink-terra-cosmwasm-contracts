@@ -14,6 +14,8 @@ use crate::{
     state::authorized_nodes_read,
 };
 
+use owned::contract::{get_owner, init as owned_init};
+
 // that should be 5 min?
 static EXPIRY_TIME: Duration = Duration::Time(60 * 5);
 static MINIMUM_CONSUMER_GAS_LIMIT: u128 = 400000;
@@ -24,6 +26,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
+    owned_init(deps, env, owned::msg::InitMsg {})?;
     let state = State {
         link_token: deps.api.canonical_address(&msg.link_token)?,
         withdrawable_tokens: ONE_FOR_CONSISTENT_GAS_COST,
@@ -158,7 +161,23 @@ pub fn handle_withdraw<S: Storage, A: Api, Q: Querier>(
     recipient: HumanAddr,
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
-    unimplemented!()
+    validate_ownership(deps, &env)?;
+    has_available_funds(deps, &env, amount)?;
+    let withdrawable_tokens = config_read(&deps.storage).load()?.withdrawable_tokens;
+
+    config(&mut deps.storage).update(|state| {
+        Ok(State {
+            withdrawable_tokens: withdrawable_tokens - ONE_FOR_CONSISTENT_GAS_COST,
+            ..state
+        })
+    })?;
+    // assert ?
+
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![],
+        data: None,
+    })
 }
 
 pub fn handle_cancel_oracle_request<S: Storage, A: Api, Q: Querier>(
@@ -200,6 +219,29 @@ fn check_callback_address<S: Storage, A: Api, Q: Querier>(
         .human_address(&config_read(&deps.storage).load()?.link_token)?;
     if !link_token_addr.eq(&to) {
         return ContractErr::BadCallback.std_err();
+    }
+    Ok(())
+}
+
+fn validate_ownership<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    env: &Env,
+) -> StdResult<()> {
+    let owner = get_owner(deps)?;
+    if env.message.sender != owner {
+        return ContractErr::NotOwner.std_err();
+    }
+    Ok(())
+}
+
+fn has_available_funds<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    env: &Env,
+    amount: Uint128,
+) -> StdResult<()> {
+    let withdrawable_tokens = config_read(&deps.storage).load()?.withdrawable_tokens;
+    if withdrawable_tokens > amount.u128() + ONE_FOR_CONSISTENT_GAS_COST {
+        return ContractErr::NotEnoughFunds.std_err();
     }
     Ok(())
 }
