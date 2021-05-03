@@ -1,40 +1,96 @@
-use aggregator_proxy::msg::InitMsg;
-use cosmwasm_std::{coins, InitResponse};
-use cosmwasm_storage::to_length_prefixed;
+mod helpers;
+
+use aggregator_proxy::msg::{HandleMsg, InitMsg, PhaseAggregators, QueryMsg};
+use cosmwasm_std::{from_binary, Env, HandleResponse, HumanAddr, InitResponse, StdResult};
 use cosmwasm_vm::{
-    from_slice,
-    testing::{init, mock_env, mock_instance},
-    Api, Storage,
+    testing::{handle, init, mock_env, query, MockApi, MockStorage},
+    Instance,
 };
+use helpers::{mock_dependencies_with_custom_querier, CustomQuerier};
 
 static WASM: &[u8] =
     include_bytes!("../../../target/wasm32-unknown-unknown/release/aggregator_proxy.wasm");
 
+static AGGREGATOR: &str = "aggregator";
+static OWNER: &str = "owner";
+
 #[test]
-fn test_init() {
-    let mut deps = mock_instance(WASM, &[]);
+fn successful_init() {
+    let (mut deps, _) = init_contract();
     assert_eq!(deps.required_features.len(), 0);
 
-    // let env = mock_env("creator", &coins(1000, "earth"));
+    let phase_id = q!(deps, GetPhaseId => u16);
+    assert!(phase_id == 1);
 
-    // let expected_state = State {
-    //     count: 4,
-    //     owner: deps.api.canonical_address(&env.message.sender).0.unwrap(),
-    // };
+    let aggregators = q!(deps, GetPhaseAggregators => PhaseAggregators);
+    let aggregator = aggregators.iter().find(|(id, _)| *id == 1);
+    assert_eq!(aggregator.unwrap().1, HumanAddr::from(AGGREGATOR));
+}
 
-    // let init_msg = InitMsg { count: 4 };
-    // let _: InitResponse = init(&mut deps, env, init_msg).unwrap();
+#[test]
+fn propose_aggregator() {
+    let new_aggregator = HumanAddr::from("new aggregator");
 
-    // let state: State = deps
-    //     .with_storage(|storage| {
-    //         println!("{:?}", *storage);
-    //         let data = storage
-    //             .get(&to_length_prefixed(CONFIG_KEY))
-    //             .0
-    //             .expect("error reading db")
-    //             .expect("no data stored");
-    //         from_slice(&data)
-    //     })
-    //     .unwrap();
-    // assert_eq!(state, expected_state);
+    let (mut deps, _) = init_contract();
+
+    let msg = HandleMsg::ProposeAggregator {
+        aggregator: new_aggregator.clone(),
+    };
+
+    let env = mock_env("not owner", &[]);
+    let res: StdResult<HandleResponse> = handle(&mut deps, env, &msg);
+    assert!(res.is_err());
+
+    let env = mock_env(OWNER, &[]);
+    let _: HandleResponse = handle(&mut deps, env, &msg).unwrap();
+
+    let aggregator = q!(deps, GetProposedAggregator => HumanAddr);
+    assert_eq!(aggregator, new_aggregator);
+}
+
+#[test]
+fn confirm_aggregator() {
+    let new_aggregator = HumanAddr::from("new aggregator");
+
+    let (mut deps, env) = init_contract();
+
+    let msg = HandleMsg::ProposeAggregator {
+        aggregator: new_aggregator.clone(),
+    };
+    let _: HandleResponse = handle(&mut deps, env.clone(), &msg).unwrap();
+    let aggregator = q!(deps, GetProposedAggregator => HumanAddr);
+    assert_eq!(aggregator, new_aggregator);
+
+    let msg = HandleMsg::ConfirmAggregator {
+        aggregator: new_aggregator.clone(),
+    };
+
+    let env = mock_env("not owner", &[]);
+    let res: StdResult<HandleResponse> = handle(&mut deps, env, &msg);
+    assert!(res.is_err());
+
+    let env = mock_env(OWNER, &[]);
+    let _: HandleResponse = handle(&mut deps, env, &msg).unwrap();
+
+    let aggregator = q!(deps, GetAggregator => HumanAddr);
+    assert_eq!(aggregator, new_aggregator);
+
+    let phase_id = q!(deps, GetPhaseId => u16);
+    assert_eq!(phase_id, 2);
+
+    let aggregators = q!(deps, GetPhaseAggregators => PhaseAggregators);
+    let aggregator = aggregators.iter().find(|(id, _)| *id == 2);
+    assert_eq!(aggregator.unwrap().1, new_aggregator);
+}
+
+fn init_contract() -> (Instance<MockStorage, MockApi, CustomQuerier>, Env) {
+    let msg = InitMsg {
+        aggregator: HumanAddr::from(AGGREGATOR),
+    };
+    let custom = mock_dependencies_with_custom_querier();
+    let mut deps = Instance::from_code(WASM, custom, 10000000).unwrap();
+    let env = mock_env(OWNER, &[]);
+    let _: InitResponse = init(&mut deps, env.clone(), msg).unwrap();
+
+    (deps, env)
 }
