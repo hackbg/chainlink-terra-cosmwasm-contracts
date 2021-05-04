@@ -12,6 +12,8 @@ pub enum ContractErr {
     BadCallback,
     #[error("Amount requested is greater than withdrawable balance")]
     NotEnoughFunds,
+    #[error("Must use a unique ID")]
+    NotUniqueId,
 }
 
 impl ContractErr {

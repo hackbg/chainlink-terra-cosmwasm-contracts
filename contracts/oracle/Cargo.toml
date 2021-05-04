@@ -27,6 +27,7 @@ serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 snafu = { version = "0.6.3" }
 cw0 = { version = "0.2.3" }
 thiserror = { version = "1.0.24" }
+link-token = { path = "../link-token", default-features = false }
 owned = { path = "../owned", default-features = false, features = ["library"] }
 
 [dev-dependencies]

@@ -591,6 +591,7 @@ dependencies = [
  "cosmwasm-std",
  "cosmwasm-storage",
  "cw0",
+ "link-token",
  "owned",
  "schemars",
  "serde",

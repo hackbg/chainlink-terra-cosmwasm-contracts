@@ -1,23 +1,25 @@
-use std::collections::hash_set::Union;
-
-use cw0::{Duration, Expiration};
+use cw0::Expiration;
 
 use cosmwasm_std::{
     to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
-    StdError, StdResult, Storage, Uint128,
+    StdError, StdResult, Storage, Uint128, WasmMsg,
 };
+use std::time::Duration;
 
-use crate::state::{authorized_nodes, config, config_read, State};
+use crate::state::{
+    authorized_nodes, commitments, commitments_read, config, config_read, Commitment, State,
+};
 use crate::{
     error::*,
     msg::{HandleMsg, InitMsg, QueryMsg},
     state::authorized_nodes_read,
 };
 
+use link_token::msg::HandleMsg as LinkMsg;
 use owned::contract::{get_owner, init as owned_init};
 
 // that should be 5 min?
-static EXPIRY_TIME: Duration = Duration::Time(60 * 5);
+// TODO static EXPIRY_TIME
 static MINIMUM_CONSUMER_GAS_LIMIT: u128 = 400000;
 static ONE_FOR_CONSISTENT_GAS_COST: u128 = 1;
 
@@ -112,7 +114,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 
 pub fn handle_set_fulfillment_permissions<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _env: Env,
     node: HumanAddr,
     allowed: bool,
 ) -> StdResult<HandleResponse> {
@@ -136,10 +138,29 @@ pub fn handle_oracle_request<S: Storage, A: Api, Q: Querier>(
     callback_address: HumanAddr,
     callback_function_id: Binary,
     nonce: Uint128,
-    data_version: Uint128,
+    _data_version: Uint128,
     data: Binary,
 ) -> StdResult<HandleResponse> {
-    unimplemented!()
+    validate_unique_commitment_id(deps, &env, nonce)?;
+    // that's 5 minutes from now
+    let expiration =
+        Expiration::AtTime(env.block.time + Duration::from_secs(300).as_nanos() as u64);
+    let commitment = Commitment {
+        caller_account: sender,
+        spec_id,
+        callback_address,
+        callback_function_id,
+        data,
+        payment,
+        expiration,
+    };
+    commitments(&mut deps.storage).save(&nonce.0.to_be_bytes(), &commitment)?;
+
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![],
+        data: None,
+    })
 }
 
 pub fn handle_fulfill_oracle_request<S: Storage, A: Api, Q: Querier>(
@@ -171,10 +192,18 @@ pub fn handle_withdraw<S: Storage, A: Api, Q: Querier>(
             ..state
         })
     })?;
-    // assert ?
+
+    let link = config_read(&deps.storage).load()?.link_token;
+    let link_addr = deps.api.human_address(&link)?;
+
+    let transfer_msg = WasmMsg::Execute {
+        contract_addr: link_addr,
+        msg: to_binary(&LinkMsg::Transfer { recipient, amount })?,
+        send: vec![],
+    };
 
     Ok(HandleResponse {
-        messages: vec![],
+        messages: vec![transfer_msg.into()],
         log: vec![],
         data: None,
     })
@@ -234,9 +263,23 @@ fn validate_ownership<S: Storage, A: Api, Q: Querier>(
     Ok(())
 }
 
+fn validate_unique_commitment_id<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    _env: &Env,
+    nonce: Uint128,
+) -> StdResult<()> {
+    if commitments_read(&deps.storage)
+        .may_load(&nonce.0.to_be_bytes())?
+        .is_some()
+    {
+        return ContractErr::NotUniqueId.std_err();
+    }
+    Ok(())
+}
+
 fn has_available_funds<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
-    env: &Env,
+    _env: &Env,
     amount: Uint128,
 ) -> StdResult<()> {
     let withdrawable_tokens = config_read(&deps.storage).load()?.withdrawable_tokens;
