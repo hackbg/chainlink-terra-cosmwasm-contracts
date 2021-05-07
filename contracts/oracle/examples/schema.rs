@@ -3,7 +3,7 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use oracle::msg::{CountResponse, HandleMsg, InitMsg, QueryMsg};
+use oracle::msg::{HandleMsg, InitMsg, QueryMsg};
 use oracle::state::State;
 
 fn main() {
@@ -16,5 +16,4 @@ fn main() {
     export_schema(&schema_for!(HandleMsg), &out_dir);
     export_schema(&schema_for!(QueryMsg), &out_dir);
     export_schema(&schema_for!(State), &out_dir);
-    export_schema(&schema_for!(CountResponse), &out_dir);
 }

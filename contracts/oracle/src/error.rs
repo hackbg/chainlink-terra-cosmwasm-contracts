@@ -14,6 +14,8 @@ pub enum ContractErr {
     NotEnoughFunds,
     #[error("Must use a unique ID")]
     NotUniqueId,
+    #[error("Not an authorized node to fulfill requests")]
+    NotAuthorizedNode,
 }
 
 impl ContractErr {

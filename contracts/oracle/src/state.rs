@@ -15,7 +15,7 @@ pub static COMMITMENTS: &[u8] = b"commitments";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
     pub link_token: CanonicalAddr,
-    pub withdrawable_tokens: u128,
+    pub withdrawable_tokens: Uint128,
 }
 
 pub fn config<S: Storage>(storage: &mut S) -> Singleton<S, State> {

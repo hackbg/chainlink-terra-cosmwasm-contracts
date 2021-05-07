@@ -3,15 +3,58 @@
   "title": "QueryMsg",
   "anyOf": [
     {
+      "description": "Check if a node is authorized for fulfilling requests",
       "type": "object",
       "required": [
-        "get_count"
+        "get_authorization_status"
       ],
       "properties": {
-        "get_count": {
+        "get_authorization_status": {
+          "type": "object",
+          "required": [
+            "node"
+          ],
+          "properties": {
+            "node": {
+              "description": "The address of the Chainlink node",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Displays the amount of LINK that is available for the node operator to withdraw",
+      "type": "object",
+      "required": [
+        "withdrawable"
+      ],
+      "properties": {
+        "withdrawable": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Returns address of the LINK token",
+      "type": "object",
+      "required": [
+        "get_chainlink_token"
+      ],
+      "properties": {
+        "get_chainlink_token": {
           "type": "object"
         }
       }
     }
-  ]
+  ],
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    }
+  }
 }

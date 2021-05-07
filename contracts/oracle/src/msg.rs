@@ -70,6 +70,7 @@ pub enum HandleMsg {
         request_id: Binary,
         /// The amount of payment given(specified in wei)
         payment: Uint128,
+        nonce: Uint128,
         /// The requester's specified callback address
         callback_func: Binary,
         /// The time of expiration for the request
@@ -89,6 +90,4 @@ pub enum QueryMsg {
     Withdrawable {},
     /// Returns address of the LINK token
     GetChainlinkToken {},
-    /// Returns the Expiry time
-    GetExpiryTime {},
 }

@@ -4,7 +4,7 @@ use cosmwasm_std::{
     to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
     StdError, StdResult, Storage, Uint128, WasmMsg,
 };
-use std::time::Duration;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::state::{
     authorized_nodes, commitments, commitments_read, config, config_read, Commitment, State,
@@ -18,7 +18,6 @@ use crate::{
 use link_token::msg::HandleMsg as LinkMsg;
 use owned::contract::{get_owner, init as owned_init};
 
-// that should be 5 min?
 // TODO static EXPIRY_TIME
 static MINIMUM_CONSUMER_GAS_LIMIT: u128 = 400000;
 static ONE_FOR_CONSISTENT_GAS_COST: u128 = 1;
@@ -31,7 +30,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     owned_init(deps, env, owned::msg::InitMsg {})?;
     let state = State {
         link_token: deps.api.canonical_address(&msg.link_token)?,
-        withdrawable_tokens: ONE_FOR_CONSISTENT_GAS_COST,
+        withdrawable_tokens: Uint128::from(ONE_FOR_CONSISTENT_GAS_COST),
     };
 
     config(&mut deps.storage).save(&state)?;
@@ -90,11 +89,18 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         HandleMsg::CancelOracleRequest {
             request_id,
             payment,
+            nonce,
             callback_func,
             expiration,
-        } => {
-            handle_cancel_oracle_request(deps, env, request_id, payment, callback_func, expiration)
-        }
+        } => handle_cancel_oracle_request(
+            deps,
+            env,
+            request_id,
+            nonce,
+            payment,
+            callback_func,
+            expiration,
+        ),
     }
 }
 
@@ -108,7 +114,6 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         }
         QueryMsg::Withdrawable {} => todo!(),
         QueryMsg::GetChainlinkToken {} => to_binary(&get_chainlink_token(deps)),
-        QueryMsg::GetExpiryTime {} => todo!(),
     }
 }
 
@@ -143,8 +148,13 @@ pub fn handle_oracle_request<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     validate_unique_commitment_id(deps, &env, nonce)?;
     // that's 5 minutes from now
-    let expiration =
-        Expiration::AtTime(env.block.time + Duration::from_secs(300).as_nanos() as u64);
+    let expiration = Expiration::AtTime(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 300,
+    );
     let commitment = Commitment {
         caller_account: sender,
         spec_id,
@@ -188,7 +198,9 @@ pub fn handle_withdraw<S: Storage, A: Api, Q: Querier>(
 
     config(&mut deps.storage).update(|state| {
         Ok(State {
-            withdrawable_tokens: withdrawable_tokens - ONE_FOR_CONSISTENT_GAS_COST,
+            withdrawable_tokens: Uint128::from(
+                withdrawable_tokens.u128() - ONE_FOR_CONSISTENT_GAS_COST,
+            ),
             ..state
         })
     })?;
@@ -212,12 +224,35 @@ pub fn handle_withdraw<S: Storage, A: Api, Q: Querier>(
 pub fn handle_cancel_oracle_request<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    request_id: Binary,
+    _request_id: Binary,
+    nonce: Uint128,
     payment: Uint128,
-    callback_func: Binary,
-    expiration: Uint128,
+    _callback_func: Binary,
+    _expiration: Uint128,
 ) -> StdResult<HandleResponse> {
-    unimplemented!()
+    let commitment = commitments_read(&deps.storage).may_load(&nonce.0.to_be_bytes())?;
+
+    if commitment.is_some() && !commitment.unwrap().expiration.is_expired(&env.block) {
+        commitments(&mut deps.storage).remove(&nonce.0.to_be_bytes());
+    }
+
+    let link = config_read(&deps.storage).load()?.link_token;
+    let link_addr = deps.api.human_address(&link)?;
+
+    let transfer_msg = WasmMsg::Execute {
+        contract_addr: link_addr,
+        msg: to_binary(&LinkMsg::Transfer {
+            recipient: env.message.sender,
+            amount: payment,
+        })?,
+        send: vec![],
+    };
+
+    Ok(HandleResponse {
+        messages: vec![transfer_msg.into()],
+        log: vec![],
+        data: None,
+    })
 }
 
 pub fn get_authorization_status<S: Storage, A: Api, Q: Querier>(
@@ -283,9 +318,23 @@ fn has_available_funds<S: Storage, A: Api, Q: Querier>(
     amount: Uint128,
 ) -> StdResult<()> {
     let withdrawable_tokens = config_read(&deps.storage).load()?.withdrawable_tokens;
-    if withdrawable_tokens > amount.u128() + ONE_FOR_CONSISTENT_GAS_COST {
+    if withdrawable_tokens.u128() > amount.u128() + ONE_FOR_CONSISTENT_GAS_COST {
         return ContractErr::NotEnoughFunds.std_err();
     }
+    Ok(())
+}
+
+fn only_authorized_nodes<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    env: &Env,
+) -> StdResult<()> {
+    let sender_addr = deps.api.canonical_address(&env.message.sender)?;
+    let owner = get_owner(deps)?;
+    let node = authorized_nodes_read(&deps.storage).may_load(sender_addr.as_slice())?;
+    if node.is_none() || env.message.sender != owner {
+        return ContractErr::NotAuthorizedNode.std_err();
+    }
+
     Ok(())
 }
 

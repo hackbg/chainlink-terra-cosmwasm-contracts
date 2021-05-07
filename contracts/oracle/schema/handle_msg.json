@@ -3,35 +3,294 @@
   "title": "HandleMsg",
   "anyOf": [
     {
+      "description": "Creates the chainlink request, stores the hash of params as the on-chain commitment for the request.",
       "type": "object",
       "required": [
-        "increment"
+        "oracle_request"
       ],
       "properties": {
-        "increment": {
-          "type": "object"
+        "oracle_request": {
+          "type": "object",
+          "required": [
+            "callback_address",
+            "callback_function_id",
+            "data",
+            "data_version",
+            "nonce",
+            "payment",
+            "sender",
+            "spec_id"
+          ],
+          "properties": {
+            "callback_address": {
+              "description": "The callback address for the response",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            },
+            "callback_function_id": {
+              "description": "The callback function ID for the response",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Binary"
+                }
+              ]
+            },
+            "data": {
+              "description": "the CBOR payload of the request",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Binary"
+                }
+              ]
+            },
+            "data_version": {
+              "description": "The specified data version",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            },
+            "nonce": {
+              "description": "The nonce sent by the request",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            },
+            "payment": {
+              "description": "The amount of payment given (specified in wei)",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            },
+            "sender": {
+              "description": "The sender of the request",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            },
+            "spec_id": {
+              "description": "The Job Specification ID",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Binary"
+                }
+              ]
+            }
+          }
         }
       }
     },
     {
+      "description": "Called by the Chainlink node to fulfill requests Given parameters must hash back to the commitment stored from `oracleRequest` Will call the callback address` callback function without bubbling up error checking, so that the node can get paid",
       "type": "object",
       "required": [
-        "reset"
+        "fulfill_oracle_request"
       ],
       "properties": {
-        "reset": {
+        "fulfill_oracle_request": {
           "type": "object",
           "required": [
-            "count"
+            "callback_address",
+            "callback_function_id",
+            "data",
+            "expiration",
+            "payment",
+            "request_id"
           ],
           "properties": {
-            "count": {
-              "type": "integer",
-              "format": "int32"
+            "callback_address": {
+              "description": "The callback address for fulfillment",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            },
+            "callback_function_id": {
+              "description": "The callback function ID for fulfillment",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Binary"
+                }
+              ]
+            },
+            "data": {
+              "description": "The data to return to the consuming contract",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Binary"
+                }
+              ]
+            },
+            "expiration": {
+              "description": "the expiration that the node should respond by before the requester can cancel",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            },
+            "payment": {
+              "description": "The payment amount that that will be released for the oracle(specified in wei)",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            },
+            "request_id": {
+              "description": "The fulfillment request ID that must match the requester's",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Binary"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Sets the fulfillment permission for a given node. 'true' to allow, 'false' to disallow",
+      "type": "object",
+      "required": [
+        "set_fulfillment_permission"
+      ],
+      "properties": {
+        "set_fulfillment_permission": {
+          "type": "object",
+          "required": [
+            "allowed",
+            "node"
+          ],
+          "properties": {
+            "allowed": {
+              "description": "Value to determine if the node can fulfill requests",
+              "type": "boolean"
+            },
+            "node": {
+              "description": "The address of the Chainlink node",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Allows the node operator to withdraw earned LINK to a given address",
+      "type": "object",
+      "required": [
+        "withdraw"
+      ],
+      "properties": {
+        "withdraw": {
+          "type": "object",
+          "required": [
+            "amount",
+            "recipient"
+          ],
+          "properties": {
+            "amount": {
+              "description": "The amount to send(specified in wei)",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            },
+            "recipient": {
+              "description": "The address to send the LINK token to",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Allows requesters to cancel requests sent to this oracle contract. Will transfer the LINK sent for the request back to the requester's address",
+      "type": "object",
+      "required": [
+        "cancel_oracle_request"
+      ],
+      "properties": {
+        "cancel_oracle_request": {
+          "type": "object",
+          "required": [
+            "callback_func",
+            "expiration",
+            "nonce",
+            "payment",
+            "request_id"
+          ],
+          "properties": {
+            "callback_func": {
+              "description": "The requester's specified callback address",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Binary"
+                }
+              ]
+            },
+            "expiration": {
+              "description": "The time of expiration for the request",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            },
+            "nonce": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "payment": {
+              "description": "The amount of payment given(specified in wei)",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            },
+            "request_id": {
+              "description": "The request ID",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Binary"
+                }
+              ]
             }
           }
         }
       }
     }
-  ]
+  ],
+  "definitions": {
+    "Binary": {
+      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
+      "type": "string"
+    },
+    "HumanAddr": {
+      "type": "string"
+    },
+    "Uint128": {
+      "type": "string"
+    }
+  }
 }
