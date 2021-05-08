@@ -1,7 +1,7 @@
 use std::thread::AccessError;
 
 use cosmwasm_std::{
-    entry_point, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    entry_point, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, attr
 };
 
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
@@ -14,8 +14,8 @@ use crate::{error::ContractError, state::ACCESS_LIST};
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
-    info: MessageInfo,
-    msg: InstantiateMsg,
+    _info: MessageInfo,
+    _msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     let state = State {
         check_enabled: true,
@@ -29,22 +29,22 @@ pub fn instantiate(
 #[entry_point]
 pub fn execute(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::AddAccess { user } => todo!(),
-        ExecuteMsg::RemoveAccess { user } => todo!(),
-        ExecuteMsg::EnableAccessCheck {} => todo!(),
-        ExecuteMsg::DisableAccessCheck {} => todo!(),
+        ExecuteMsg::AddAccess { user } => Ok(try_add_access(deps, env, info, user)?),
+        ExecuteMsg::RemoveAccess { user } => Ok(try_remove_access(deps, env, info, user)?),
+        ExecuteMsg::EnableAccessCheck {} => Ok(try_enable_access_check(deps, env, info)?),
+        ExecuteMsg::DisableAccessCheck {} => Ok(try_disable_access_check(deps,env, info)?),
     }
 }
 
 pub fn try_add_access(
     deps: DepsMut,
     _env: Env,
-    info: MessageInfo,
+    _info: MessageInfo,
     user: Addr,
 ) -> StdResult<Response> {
     let may_have_access = ACCESS_LIST.may_load(deps.storage, &user)?;
@@ -54,7 +54,10 @@ pub fn try_add_access(
     Ok(Response {
         submessages: vec![],
         messages: vec![],
-        attributes: vec![],
+        attributes: vec![
+            attr("action", "added access"),
+            attr("user", user)
+        ],
         data: None,
     })
 }
@@ -62,7 +65,7 @@ pub fn try_add_access(
 pub fn try_remove_access(
     deps: DepsMut,
     _env: Env,
-    info: MessageInfo,
+    _info: MessageInfo,
     user: Addr,
 ) -> StdResult<Response> {
     let may_have_access = ACCESS_LIST.may_load(deps.storage, &user)?;
@@ -74,15 +77,18 @@ pub fn try_remove_access(
     Ok(Response {
         submessages: vec![],
         messages: vec![],
-        attributes: vec![],
+        attributes: vec![
+            attr("action", "removed access"),
+            attr("user", user)
+        ],
         data: None,
     })
 }
 
-pub fn try_enable_access_check(deps: DepsMut, _env: Env, info: MessageInfo) -> StdResult<Response> {
+pub fn try_enable_access_check(deps: DepsMut, _env: Env, _info: MessageInfo) -> StdResult<Response> {
     let check = config_read(deps.storage).load()?.check_enabled;
     if !check {
-        config(deps.storage).update(|state| -> StdResult<_> {
+        config(deps.storage).update(|_state| -> StdResult<_> {
             Ok(State {
                 check_enabled: true,
             })
@@ -91,7 +97,9 @@ pub fn try_enable_access_check(deps: DepsMut, _env: Env, info: MessageInfo) -> S
     Ok(Response {
         submessages: vec![],
         messages: vec![],
-        attributes: vec![],
+        attributes: vec![
+            attr("action", "enable access check"),
+        ],
         data: None,
     })
 }
@@ -99,11 +107,11 @@ pub fn try_enable_access_check(deps: DepsMut, _env: Env, info: MessageInfo) -> S
 pub fn try_disable_access_check(
     deps: DepsMut,
     _env: Env,
-    info: MessageInfo,
+    _info: MessageInfo,
 ) -> StdResult<Response> {
     let check = config_read(deps.storage).load()?.check_enabled;
     if check {
-        config(deps.storage).update(|state| -> StdResult<_> {
+        config(deps.storage).update(|_state| -> StdResult<_> {
             Ok(State {
                 check_enabled: false,
             })
@@ -112,7 +120,9 @@ pub fn try_disable_access_check(
     Ok(Response {
         submessages: vec![],
         messages: vec![],
-        attributes: vec![],
+        attributes: vec![
+            attr("action", "disable access check")
+        ],
         data: None,
     })
 }
@@ -120,14 +130,22 @@ pub fn try_disable_access_check(
 #[entry_point]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::HasAccess { user } => to_binary(&has_access(deps, env)?),
+        QueryMsg::HasAccess { user } => to_binary(&has_access(deps, env, user)?),
+        QueryMsg::GetCheckEnabled {} => to_binary(&query_check_enabled(deps, env)?),
     }
 }
 
-pub fn has_access(deps: Deps, env: Env) -> StdResult<bool> {
+pub fn has_access(deps: Deps, _env: Env, user: Addr) -> StdResult<bool> {
     let access = config_read(deps.storage).load()?.check_enabled;
+    let user = ACCESS_LIST.load(deps.storage, &user)?;
 
-    Ok(access)
+    Ok(user || !access)
+}
+
+pub fn query_check_enabled(deps: Deps, _env: Env) -> StdResult<bool> {
+    let check_enabled = config_read(deps.storage).load()?.check_enabled;
+
+    Ok(check_enabled)
 }
 
 #[cfg(test)]
