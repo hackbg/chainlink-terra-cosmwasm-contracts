@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "State",
+  "type": "object",
+  "required": [
+    "check_enabled"
+  ],
+  "properties": {
+    "check_enabled": {
+      "type": "boolean"
+    }
+  }
+}
