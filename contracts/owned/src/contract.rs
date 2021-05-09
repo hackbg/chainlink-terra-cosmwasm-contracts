@@ -1,110 +1,110 @@
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr,
-    InitResponse, LogAttribute, Querier, StdError, StdResult, Storage,
+    attr, entry_point, to_binary, Addr, Attribute, Deps, DepsMut, Env, MessageInfo, QueryResponse,
+    Response, StdResult,
 };
 
-use crate::msg::{HandleMsg, InitMsg, QueryMsg};
+use crate::error::ContractError;
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{owner, owner_read, State};
 
-pub fn init<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
-    _msg: InitMsg,
-) -> StdResult<InitResponse> {
+#[entry_point]
+pub fn instantiate(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    _msg: InstantiateMsg,
+) -> Result<Response, ContractError> {
     let state = State {
-        owner: deps.api.canonical_address(&env.message.sender)?,
+        owner: info.sender,
         pending_owner: None,
     };
 
-    owner(&mut deps.storage).save(&state)?;
+    owner(deps.storage).save(&state)?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
-pub fn handle<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+#[entry_point]
+pub fn execute(
+    deps: DepsMut,
     env: Env,
-    msg: HandleMsg,
-) -> StdResult<HandleResponse> {
+    info: MessageInfo,
+    msg: ExecuteMsg,
+) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::TransferOwnership { to } => handle_transfer_ownership(deps, env, to),
-        HandleMsg::AcceptOwnership {} => handle_accept_ownership(deps, env),
+        ExecuteMsg::TransferOwnership { to } => handle_transfer_ownership(deps, env, info, to),
+        ExecuteMsg::AcceptOwnership {} => handle_accept_ownership(deps, env, info),
     }
 }
 
-pub fn query<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    msg: QueryMsg,
-) -> StdResult<Binary> {
+#[entry_point]
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<QueryResponse> {
     match msg {
-        QueryMsg::GetOwner {} => to_binary(&get_owner(deps)),
+        QueryMsg::GetOwner {} => to_binary(&get_owner(deps)?),
     }
 }
 
-pub fn handle_transfer_ownership<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_transfer_ownership(
+    deps: DepsMut,
     env: Env,
-    to: CanonicalAddr,
-) -> StdResult<HandleResponse> {
-    let sender = deps.api.canonical_address(&env.message.sender)?;
-    let owner = owner_read(&deps.storage).load()?.owner;
+    info: MessageInfo,
+    to: Addr,
+) -> Result<Response, ContractError> {
+    let sender = info.sender;
+    let owner = owner_read(deps.storage).load()?.owner;
     if sender != owner {
-        return Err(StdError::generic_err("Only callable by owner"));
+        return Err(ContractError::OnlyOwner {});
     }
 
-    let logs = transfer_ownership(deps, env, to)?;
+    let attributes = transfer_ownership(deps, env, to)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
-        log: logs,
+        attributes,
         data: None,
     })
 }
 
-fn transfer_ownership<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    _env: Env,
-    to: CanonicalAddr,
-) -> StdResult<Vec<LogAttribute>> {
-    owner(&mut deps.storage).update(|mut state| {
+fn transfer_ownership(deps: DepsMut, _env: Env, to: Addr) -> Result<Vec<Attribute>, ContractError> {
+    owner(deps.storage).update(|mut state| -> StdResult<_> {
         state.pending_owner = Some(to.clone());
 
         Ok(state)
     })?;
 
     Ok(vec![
-        log("action", "ownership transferred"),
-        log("pending_owner", deps.api.human_address(&to).unwrap()),
+        attr("action", "ownership transferred"),
+        attr("pending_owner", to),
     ])
 }
 
-pub fn handle_accept_ownership<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_accept_ownership(
+    deps: DepsMut,
     env: Env,
-) -> StdResult<HandleResponse> {
-    let sender = deps.api.canonical_address(&env.message.sender)?;
-    let pending_owner = owner_read(&deps.storage).load()?.pending_owner;
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+    let sender = info.clone().sender;
+    let pending_owner = owner_read(deps.storage).load()?.pending_owner;
 
     if sender != pending_owner.unwrap() {
-        return Err(StdError::generic_err("Must be proposed owner"));
+        return Err(ContractError::MustBeProposed {});
     }
 
-    let logs = accept_ownership(deps, env)?;
+    let logs = accept_ownership(deps, env, info)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
-        log: logs,
+        attributes: logs,
         data: None,
     })
 }
 
-fn accept_ownership<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
-) -> StdResult<Vec<LogAttribute>> {
-    let sender = deps.api.canonical_address(&env.message.sender)?;
+fn accept_ownership(deps: DepsMut, _env: Env, info: MessageInfo) -> StdResult<Vec<Attribute>> {
+    let sender = info.sender;
 
-    owner(&mut deps.storage).update(|mut state| {
+    owner(deps.storage).update(|mut state| -> StdResult<_> {
         state.owner = sender.clone();
         state.pending_owner = None;
 
@@ -112,111 +112,107 @@ fn accept_ownership<S: Storage, A: Api, Q: Querier>(
     })?;
 
     Ok(vec![
-        log("action", "ownership accepted"),
-        log("owner", deps.api.human_address(&sender).unwrap()),
+        attr("action", "ownership accepted"),
+        attr("owner", sender),
     ])
 }
 
-pub fn get_owner<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<HumanAddr> {
-    let owner = owner_read(&deps.storage).load()?.owner;
+pub fn get_owner(deps: Deps) -> StdResult<Addr> {
+    let owner = owner_read(deps.storage).load()?.owner;
 
-    deps.api.human_address(&owner)
+    Ok(owner)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coins, from_binary, HumanAddr};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
+    use cosmwasm_std::{coins, Addr};
 
     #[test]
     fn proper_initialization() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
-        let msg = InitMsg {};
-        let env = mock_env("creator", &coins(1000, "earth"));
+        let msg = InstantiateMsg {};
+        let info = mock_info("creator", &coins(1000, "earth"));
 
-        let sender = env.clone().message.sender;
+        let sender = info.clone().sender;
         // we can just call .unwrap() to assert this was a success
-        let res = init(&mut deps, env, msg).unwrap();
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
-        let res = query(&deps, QueryMsg::GetOwner {}).unwrap();
-        let owner: StdResult<HumanAddr> = from_binary(&res).unwrap();
-        assert_eq!(true, HumanAddr::eq(&sender, &owner.unwrap()));
+        let res = get_owner(deps.as_ref()).unwrap();
+        assert_eq!(String::from(sender), String::from(res));
     }
 
     #[test]
     fn transfer_ownership() {
-        let mut deps = mock_dependencies(20, &[]);
-        let env = mock_env("creator", &coins(1000, "earth"));
+        let mut deps = mock_dependencies(&[]);
 
-        let msg = InitMsg {};
+        let msg = InstantiateMsg {};
+        let info = mock_info("creator", &coins(1000, "earth"));
 
-        let res: InitResponse = init(&mut deps, env.clone(), msg).unwrap();
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let mock_addr = deps
-            .api
-            .canonical_address(&HumanAddr::from(MOCK_CONTRACT_ADDR))
-            .unwrap();
+        let mock_addr = String::from(MOCK_CONTRACT_ADDR);
 
-        let msg = HandleMsg::TransferOwnership {
-            to: mock_addr.clone(),
-        };
-
-        let res = handle(&mut deps, env, msg).unwrap();
+        let res = handle_transfer_ownership(
+            deps.as_mut(),
+            mock_env(),
+            info,
+            Addr::unchecked(mock_addr.clone()),
+        )
+        .unwrap();
         assert_eq!(0, res.messages.len());
 
-        let _res = query(&deps, QueryMsg::GetOwner {}).unwrap();
-        let new_pending_owner = owner_read(&deps.storage)
+        let res = owner_read(&deps.storage)
             .load()
             .unwrap()
             .pending_owner
             .unwrap();
-        assert_eq!(true, CanonicalAddr::eq(&mock_addr, &new_pending_owner));
+
+        assert_eq!(mock_addr, String::from(res));
     }
 
     #[test]
     fn accept_ownership() {
-        let mut deps = mock_dependencies(20, &[]);
-        let env = mock_env("creator", &coins(1000, "earth"));
+        let mut deps = mock_dependencies(&[]);
 
-        let msg = InitMsg {};
+        let msg = InstantiateMsg {};
+        let info = mock_info("creator", &coins(1000, "earth"));
 
-        let res = init(&mut deps, env.clone(), msg).unwrap();
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let mock_addr = deps
-            .api
-            .canonical_address(&HumanAddr::from(MOCK_CONTRACT_ADDR))
+        let mock_addr = String::from(MOCK_CONTRACT_ADDR);
+
+        let res = handle_transfer_ownership(
+            deps.as_mut(),
+            mock_env(),
+            info,
+            Addr::unchecked(mock_addr.clone()),
+        )
+        .unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let res = owner_read(deps.as_ref().storage)
+            .load()
+            .unwrap()
+            .pending_owner
             .unwrap();
 
-        let msg = HandleMsg::TransferOwnership {
-            to: mock_addr.clone(),
-        };
-
-        let res = handle(&mut deps, env.clone(), msg).unwrap();
+        assert_eq!(mock_addr, String::from(res));
+        let info = mock_info(MOCK_CONTRACT_ADDR, &coins(1000, "earth"));
+        let msg = ExecuteMsg::AcceptOwnership {};
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let _res = query(&deps, QueryMsg::GetOwner {}).unwrap();
-        let new_pending_owner = owner_read(&deps.storage).load().unwrap().pending_owner;
-        assert_eq!(
-            true,
-            CanonicalAddr::eq(&mock_addr, &new_pending_owner.clone().unwrap())
-        );
-
-        let env = mock_env(MOCK_CONTRACT_ADDR, &coins(1000, "earth"));
-        let msg = HandleMsg::AcceptOwnership {};
-        let res = handle(&mut deps, env.clone(), msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        let _res = query(&deps, QueryMsg::GetOwner {}).unwrap();
-        assert_eq!(
-            true,
-            CanonicalAddr::eq(&mock_addr, &new_pending_owner.clone().unwrap())
-        );
+        let res = owner_read(deps.as_ref().storage).load().unwrap().owner;
+        assert_eq!(mock_addr, String::from(res));
         let new_pending_owner = owner_read(&deps.storage).load().unwrap().pending_owner;
         assert_eq!(true, new_pending_owner.is_none());
     }
