@@ -1,191 +1,192 @@
-use crate::{error::*, msg::*, state::*};
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
-    StdResult, Storage,
+    attr, entry_point, to_binary, Addr, Attribute, Binary, Deps, DepsMut, Env, MessageInfo,
+    QueryResponse, Response, StdResult,
 };
-use owned::contract::{get_owner, init as owned_init};
 
-pub fn init<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+use crate::error::ContractError;
+use crate::msg::*;
+use crate::state::*;
+use owned::contract::{get_owner, instantiate as owned_init};
+
+#[entry_point]
+pub fn instantiate(
+    deps: DepsMut,
     env: Env,
-    msg: InitMsg,
-) -> StdResult<InitResponse> {
-    owned_init(deps, env, owned::msg::InitMsg {})?;
-    config(&mut deps.storage).save(&State {
+    info: MessageInfo,
+    msg: InstantiateMsg,
+) -> Result<Response, owned::error::ContractError> {
+    config(deps.storage).save(&State {
         raising_access_controller: msg.rac_address,
     })?;
+    owned_init(deps, env, info, owned::msg::InstantiateMsg {})?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
-pub fn handle<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+#[entry_point]
+pub fn execute(
+    deps: DepsMut,
     env: Env,
-    msg: HandleMsg,
-) -> StdResult<HandleResponse> {
+    info: MessageInfo,
+    msg: ExecuteMsg,
+) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::RaiseFlag { subject } => handle_raise_flag(deps, env, subject),
-        HandleMsg::RaiseFlags { subjects } => handle_raise_flags(deps, env, subjects),
-        HandleMsg::LowerFlags { subjects } => handle_lower_flags(deps, env, subjects),
-        HandleMsg::SetRaisingAccessController { rac_address } => {
-            handle_set_raising_access_controller(deps, env, rac_address)
+        ExecuteMsg::RaiseFlag { subject } => handle_raise_flag(deps, env, info, subject),
+        ExecuteMsg::RaiseFlags { subjects } => handle_raise_flags(deps, env, info, subjects),
+        ExecuteMsg::LowerFlags { subjects } => handle_lower_flags(deps, env, info, subjects),
+        ExecuteMsg::SetRaisingAccessController { rac_address } => {
+            handle_set_raising_access_controller(deps, env, info, rac_address)
         }
     }
 }
 
-pub fn query<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    msg: QueryMsg,
-) -> StdResult<Binary> {
+#[entry_point]
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
     match msg {
-        QueryMsg::GetFlag { subject } => to_binary(&get_flag(deps, subject)),
-        QueryMsg::GetFlags { subjects } => to_binary(&get_flags(deps, subjects)),
-        QueryMsg::GetRac {} => to_binary(&get_rac(deps)),
+        QueryMsg::GetFlag { subject } => Ok(to_binary(&get_flag(deps, subject)?)?),
+        QueryMsg::GetFlags { subjects } => Ok(to_binary(&get_flags(deps, subjects)?)?),
+        QueryMsg::GetRac {} => Ok(to_binary(&get_rac(deps)?)?),
     }
 }
 
-pub fn handle_raise_flag<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_raise_flag(
+    deps: DepsMut,
     _env: Env,
-    subject: HumanAddr,
-) -> StdResult<HandleResponse> {
-    check_access(deps)?;
-    let key = deps.api.canonical_address(&subject)?;
-    if flags_read(&deps.storage).may_load(key.as_slice())? == Some(true) {
-        Ok(HandleResponse {
+    _info: MessageInfo,
+    subject: Addr,
+) -> Result<Response, ContractError> {
+    check_access(deps.as_ref())?;
+    if FLAGS.may_load(deps.as_ref().storage, &subject)? == Some(true) {
+        Ok(Response {
+            submessages: vec![],
             messages: vec![],
-            log: vec![
-                log("action", "already raised flag"),
-                log("subject", subject),
+            attributes: vec![
+                attr("action", "already raised flag"),
+                attr("subject", subject),
             ],
             data: None,
         })
     } else {
-        flags(&mut deps.storage).save(key.as_slice(), &true)?;
-        Ok(HandleResponse {
+        FLAGS.save(deps.storage, &subject, &true)?;
+        Ok(Response {
+            submessages: vec![],
             messages: vec![],
-            log: vec![log("action", "raised flag"), log("subject", subject)],
+            attributes: vec![attr("action", "raised flag"), attr("subject", subject)],
             data: None,
         })
     }
 }
 
-pub fn handle_raise_flags<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_raise_flags(
+    deps: DepsMut,
     _env: Env,
-    subjects: Vec<HumanAddr>,
-) -> StdResult<HandleResponse> {
-    check_access(deps)?;
-    let mut logs = vec![];
+    _info: MessageInfo,
+    subjects: Vec<Addr>,
+) -> Result<Response, ContractError> {
+    check_access(deps.as_ref())?;
+    let mut attributes = vec![];
     for subject in subjects {
-        let key = deps.api.canonical_address(&subject)?;
-        if flags_read(&deps.storage).may_load(key.as_slice())? == Some(true) {
-            logs.extend_from_slice(&[
-                log("action", "already raised flag"),
-                log("subject", subject),
+        if FLAGS.may_load(deps.as_ref().storage, &subject)? == Some(true) {
+            attributes.extend_from_slice(&[
+                attr("action", "already raised flag"),
+                attr("subject", subject),
             ]);
         } else {
-            flags(&mut deps.storage).save(key.as_slice(), &true)?;
-            logs.extend_from_slice(&[log("action", "flag raised"), log("subject", subject)]);
+            FLAGS.save(deps.storage, &subject, &true)?;
+            attributes
+                .extend_from_slice(&[attr("action", "flag raised"), attr("subject", subject)]);
         }
     }
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
-        log: logs,
+        attributes,
         data: None,
     })
 }
 
-pub fn handle_lower_flags<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_lower_flags(
+    deps: DepsMut,
     env: Env,
-    subjects: Vec<HumanAddr>,
-) -> StdResult<HandleResponse> {
-    validate_ownership(deps, &env)?;
-    let mut logs = vec![];
+    info: MessageInfo,
+    subjects: Vec<Addr>,
+) -> Result<Response, ContractError> {
+    validate_ownership(deps.as_ref(), &env, info)?;
+    let mut attributes = vec![];
     for subject in subjects {
-        let key = deps.api.canonical_address(&subject)?;
-        if flags_read(&deps.storage).may_load(key.as_slice())? == Some(true) {
-            flags(&mut deps.storage).save(key.as_slice(), &false)?;
-            logs.extend_from_slice(&[log("action", "flag lowered"), log("address", subject)]);
+        if FLAGS.may_load(deps.storage, &subject)? == Some(true) {
+            FLAGS.save(deps.storage, &subject, &false)?;
+            attributes
+                .extend_from_slice(&[attr("action", "flag lowered"), attr("address", subject)]);
         }
     }
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
-        log: logs,
+        attributes,
         data: None,
     })
 }
 
-pub fn handle_set_raising_access_controller<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_set_raising_access_controller(
+    deps: DepsMut,
     env: Env,
-    rac_address: HumanAddr,
-) -> StdResult<HandleResponse> {
-    validate_ownership(deps, &env)?;
-    let prev_rac = config_read(&deps.storage).load()?.raising_access_controller;
-    config(&mut deps.storage).update(|_state| {
+    info: MessageInfo,
+    rac_address: Addr,
+) -> Result<Response, ContractError> {
+    validate_ownership(deps.as_ref(), &env, info)?;
+    let prev_rac = config_read(deps.storage).load()?.raising_access_controller;
+    config(deps.storage).update(|_state| -> StdResult<_> {
         Ok(State {
             raising_access_controller: rac_address.clone(),
         })
     })?;
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
-        log: vec![
-            log("action", "raising access controller updated"),
-            log("address", rac_address),
-            log("previous", prev_rac),
+        attributes: vec![
+            attr("action", "raising access controller updated"),
+            attr("address", rac_address),
+            attr("previous", prev_rac),
         ],
         data: None,
     })
 }
 
-pub fn get_flag<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    subject: HumanAddr,
-) -> StdResult<bool> {
+pub fn get_flag(deps: Deps, subject: Addr) -> Result<bool, ContractError> {
     check_access(deps)?;
-    let key = deps.api.canonical_address(&subject)?;
-    flags_read(&deps.storage).load(key.as_slice())
+    Ok(FLAGS.load(deps.storage, &subject)?)
 }
 
-pub fn get_flags<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    subjects: Vec<HumanAddr>,
-) -> StdResult<Vec<bool>> {
+pub fn get_flags(deps: Deps, subjects: Vec<Addr>) -> Result<Vec<bool>, ContractError> {
     check_access(deps)?;
     let flags = subjects
         .iter()
         .filter_map(|subject| {
-            let flag = flags_read(&deps.storage)
-                .load(deps.api.canonical_address(subject).ok()?.as_slice())
-                .ok()?;
+            let flag = FLAGS.load(deps.storage, subject).ok()?;
             Some(flag)
         })
         .collect();
     Ok(flags)
 }
 
-pub fn get_rac<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<HumanAddr> {
-    let raising_access_controller = config_read(&deps.storage).load()?.raising_access_controller;
+pub fn get_rac(deps: Deps) -> StdResult<Addr> {
+    let raising_access_controller = config_read(deps.storage).load()?.raising_access_controller;
     Ok(raising_access_controller)
 }
 
-fn validate_ownership<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    env: &Env,
-) -> StdResult<()> {
+fn validate_ownership(deps: Deps, _env: &Env, info: MessageInfo) -> Result<(), ContractError> {
     let owner = get_owner(deps)?;
-    if env.message.sender != owner {
-        return ContractErr::NotOwner.std_err();
+    if info.sender != owner {
+        return Err(ContractError::NotOwner {});
     }
     Ok(())
 }
 
 // TODO this needs to be an actual call to access controller
-fn check_access<S: Storage, A: Api, Q: Querier>(_deps: &Extern<S, A, Q>) -> StdResult<()> {
+fn check_access(_deps: Deps) -> Result<(), ContractError> {
     if false {
-        return ContractErr::NoAccess.std_err();
+        return Err(ContractError::NoAccess {});
     }
     Ok(())
 }
@@ -193,105 +194,90 @@ fn check_access<S: Storage, A: Api, Q: Querier>(_deps: &Extern<S, A, Q>) -> StdR
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, from_binary, HumanAddr};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{coins, Addr};
 
     #[test]
     fn proper_initialization() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
-        let msg = InitMsg {
-            rac_address: HumanAddr::from("rac"),
+        let msg = InstantiateMsg {
+            rac_address: Addr::unchecked("rac"),
         };
-        let env = mock_env("creator", &coins(1000, "earth"));
+        let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
-        let res = init(&mut deps, env, msg).unwrap();
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
     }
 
     #[test]
     fn raise_flag() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
-        let msg = InitMsg {
-            rac_address: HumanAddr::from("rac"),
+        let msg = InstantiateMsg {
+            rac_address: Addr::unchecked("rac"),
         };
-        let env = mock_env("creator", &coins(1000, "earth"));
+        let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
-        let res = init(&mut deps, env, msg).unwrap();
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let env = mock_env("human", &[]);
-        let addr = env.message.sender.clone();
-        let msg = HandleMsg::RaiseFlag {
+        let info = mock_info("human", &[]);
+        let addr = info.sender.clone();
+
+        let msg = ExecuteMsg::RaiseFlag {
             subject: addr.clone(),
         };
 
-        let _res = handle(&mut deps, env.clone(), msg.clone());
+        let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone());
 
-        let res = query(
-            &deps,
-            QueryMsg::GetFlag {
-                subject: addr.clone(),
-            },
-        )
-        .unwrap();
-
-        let flag: StdResult<bool> = from_binary(&res).unwrap();
-        assert_eq!(true, flag.unwrap());
+        let flag = get_flag(deps.as_ref(), addr.clone()).unwrap();
+        assert_eq!(true, flag);
 
         // trying to raise the flag when it's already raised
-        let res = handle(&mut deps, env.clone(), msg.clone());
+        let res = execute(deps.as_mut(), mock_env(), info, msg.clone());
         assert_eq!(
             vec![
-                log("action", "already raised flag"),
-                log("subject", addr.clone())
+                attr("action", "already raised flag"),
+                attr("subject", addr.clone())
             ],
-            res.unwrap().log
+            res.unwrap().attributes
         );
     }
 
     #[test]
     fn raise_flags() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
-        let msg = InitMsg {
-            rac_address: HumanAddr::from("rac"),
+        let msg = InstantiateMsg {
+            rac_address: Addr::unchecked("rac"),
         };
-        let env = mock_env("creator", &coins(1000, "earth"));
+        let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
-        let res = init(&mut deps, env, msg).unwrap();
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let env = mock_env("human", &[]);
-        let addr = env.message.sender.clone();
-        let msg = HandleMsg::RaiseFlags {
+        let info = mock_info("human", &[]);
+        let addr = info.sender.clone();
+
+        let _res = handle_raise_flags(deps.as_mut(), mock_env(), info.clone(), vec![addr.clone()]);
+
+        let flags = get_flags(deps.as_ref(), vec![addr.clone()]);
+        assert_eq!(vec![true], flags.unwrap());
+
+        let msg = ExecuteMsg::RaiseFlags {
             subjects: vec![addr.clone()],
         };
-
-        let _res = handle(&mut deps, env.clone(), msg.clone());
-
-        let res = query(
-            &deps,
-            QueryMsg::GetFlags {
-                subjects: vec![addr.clone()],
-            },
-        )
-        .unwrap();
-
-        let flag: StdResult<Vec<bool>> = from_binary(&res).unwrap();
-        assert_eq!(vec![true], flag.unwrap());
-
-        let res = handle(&mut deps, env.clone(), msg.clone());
+        let res = execute(deps.as_mut(), mock_env(), info, msg.clone());
         assert_eq!(
             vec![
-                log("action", "already raised flag"),
-                log("subject", addr.clone())
+                attr("action", "already raised flag"),
+                attr("subject", addr.clone())
             ],
-            res.unwrap().log
+            res.unwrap().attributes
         );
     }
 }
