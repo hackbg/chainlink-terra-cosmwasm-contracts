@@ -587,14 +587,13 @@ dependencies = [
 name = "flags"
 version = "0.1.0"
 dependencies = [
- "cosmwasm-schema 0.10.1",
- "cosmwasm-std 0.10.1",
- "cosmwasm-storage 0.10.1",
- "cosmwasm-vm",
+ "cosmwasm-schema 0.14.0",
+ "cosmwasm-std 0.14.0",
+ "cosmwasm-storage 0.14.0",
+ "cw-storage-plus",
  "owned",
- "schemars 0.7.6",
+ "schemars 0.8.3",
  "serde",
- "snafu",
  "thiserror",
 ]
 

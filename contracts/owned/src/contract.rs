@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    attr, entry_point, to_binary, Addr, Attribute, Deps, DepsMut, Env, MessageInfo, QueryResponse,
+    attr, to_binary, Addr, Attribute, Deps, DepsMut, Env, MessageInfo, QueryResponse,
     Response, StdResult,
 };
 
@@ -7,7 +7,6 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{owner, owner_read, State};
 
-#[entry_point]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -24,7 +23,6 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
-#[entry_point]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -37,7 +35,6 @@ pub fn execute(
     }
 }
 
-#[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<QueryResponse> {
     match msg {
         QueryMsg::GetOwner {} => to_binary(&get_owner(deps)?),
