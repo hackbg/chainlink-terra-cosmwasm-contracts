@@ -124,7 +124,7 @@ pub fn get_owner(deps: Deps) -> StdResult<Addr> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coins, Addr, Api};
+    use cosmwasm_std::{coins, Api};
 
     #[test]
     fn proper_initialization() {
@@ -153,14 +153,10 @@ mod tests {
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
         assert_eq!(0, res.messages.len());
+        let mock_addr = deps.api.addr_validate(MOCK_CONTRACT_ADDR).unwrap();
 
-        let res = handle_transfer_ownership(
-            deps.as_mut(),
-            mock_env(),
-            info,
-            deps.api.addr_validate(MOCK_CONTRACT_ADDR).unwrap(),
-        )
-        .unwrap();
+        let res =
+            handle_transfer_ownership(deps.as_mut(), mock_env(), info, mock_addr.clone()).unwrap();
         assert_eq!(0, res.messages.len());
 
         let res = owner_read(&deps.storage)
@@ -169,7 +165,7 @@ mod tests {
             .pending_owner
             .unwrap();
 
-        assert_eq!(mock_addr, String::from(res));
+        assert_eq!(mock_addr, res);
     }
 
     #[test]
@@ -183,15 +179,10 @@ mod tests {
         let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let mock_addr = String::from(MOCK_CONTRACT_ADDR);
+        let mock_addr = deps.api.addr_validate(MOCK_CONTRACT_ADDR).unwrap();
 
-        let res = handle_transfer_ownership(
-            deps.as_mut(),
-            mock_env(),
-            info,
-            deps.api.addr_validate(MOCK_CONTRACT_ADDR).unwrap(),
-        )
-        .unwrap();
+        let res =
+            handle_transfer_ownership(deps.as_mut(), mock_env(), info, mock_addr.clone()).unwrap();
         assert_eq!(0, res.messages.len());
 
         let res = owner_read(deps.as_ref().storage)
@@ -200,7 +191,7 @@ mod tests {
             .pending_owner
             .unwrap();
 
-        assert_eq!(mock_addr, String::from(res));
+        assert_eq!(mock_addr, res);
         let info = mock_info(MOCK_CONTRACT_ADDR, &coins(1000, "earth"));
         let msg = ExecuteMsg::AcceptOwnership {};
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
