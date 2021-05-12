@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, to_binary, Addr, Attribute, Deps, DepsMut, Env, MessageInfo, QueryResponse,
-    Response, StdResult,
+    attr, to_binary, Addr, Attribute, Deps, DepsMut, Env, MessageInfo, QueryResponse, Response,
+    StdResult,
 };
 
 use crate::error::ContractError;
@@ -124,7 +124,7 @@ pub fn get_owner(deps: Deps) -> StdResult<Addr> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coins, Addr};
+    use cosmwasm_std::{coins, Addr, Api};
 
     #[test]
     fn proper_initialization() {
@@ -154,13 +154,11 @@ mod tests {
         let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let mock_addr = String::from(MOCK_CONTRACT_ADDR);
-
         let res = handle_transfer_ownership(
             deps.as_mut(),
             mock_env(),
             info,
-            Addr::unchecked(mock_addr.clone()),
+            deps.api.addr_validate(MOCK_CONTRACT_ADDR).unwrap(),
         )
         .unwrap();
         assert_eq!(0, res.messages.len());
@@ -191,7 +189,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info,
-            Addr::unchecked(mock_addr.clone()),
+            deps.api.addr_validate(MOCK_CONTRACT_ADDR).unwrap(),
         )
         .unwrap();
         assert_eq!(0, res.messages.len());

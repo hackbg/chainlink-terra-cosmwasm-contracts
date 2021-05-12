@@ -1,5 +1,6 @@
 use cosmwasm_std::{
-    attr, entry_point, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    attr, entry_point, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response,
+    StdResult,
 };
 
 use crate::error::ContractError;
@@ -194,14 +195,14 @@ fn check_access(_deps: Deps) -> Result<(), ContractError> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Addr};
+    use cosmwasm_std::{coins, Addr, Api};
 
     #[test]
     fn proper_initialization() {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            rac_address: Addr::unchecked("rac"),
+            rac_address: deps.api.addr_validate("rac").unwrap(),
         };
         let info = mock_info("creator", &coins(1000, "earth"));
 
@@ -215,7 +216,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            rac_address: Addr::unchecked("rac"),
+            rac_address: deps.api.addr_validate("rac").unwrap(),
         };
         let info = mock_info("creator", &coins(1000, "earth"));
 
@@ -251,7 +252,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            rac_address: Addr::unchecked("rac"),
+            rac_address: deps.api.addr_validate("rac").unwrap(),
         };
         let info = mock_info("creator", &coins(1000, "earth"));
 
