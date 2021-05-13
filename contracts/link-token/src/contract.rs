@@ -1,18 +1,19 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, Env, Extern, HandleResponse, InitResponse, Querier, StdResult, Storage,
-    Uint128,
+    to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
 };
-use cw20::{Cw20CoinHuman, TokenInfoResponse};
+use cw20::{Cw20Coin, TokenInfoResponse};
 use cw20_base::{
     allowances::{
-        handle_decrease_allowance, handle_increase_allowance, handle_transfer_from, query_allowance,
+        execute_decrease_allowance, execute_increase_allowance, execute_transfer_from,
+        query_allowance,
     },
-    contract::{create_accounts, handle_send, handle_transfer, query_balance},
+    contract::{create_accounts, execute_send, execute_transfer, query_balance},
+    ContractError,
 };
 
 use crate::{
-    msg::{HandleMsg, InitMsg, QueryMsg},
-    state::{token_info, token_info_read, TokenInfo},
+    msg::{HandleMsg, InstantiateMsg, QueryMsg},
+    state::{TokenInfo, TOKEN_INFO},
 };
 
 pub const TOKEN_NAME: &str = "Chainlink";
@@ -20,16 +21,17 @@ pub const TOKEN_SYMBOL: &str = "LINK";
 pub const DECIMALS: u8 = 18;
 pub const TOTAL_SUPPLY: u128 = 1_000_000_000;
 
-pub fn init<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
-    _msg: InitMsg,
-) -> StdResult<InitResponse> {
-    let main_balance = Cw20CoinHuman {
-        address: env.message.sender,
+pub fn instantiate(
+    mut deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    _msg: InstantiateMsg,
+) -> StdResult<Response> {
+    let main_balance = Cw20Coin {
+        address: info.sender.into(),
         amount: Uint128::from(TOTAL_SUPPLY),
     };
-    let total_supply = create_accounts(deps, &[main_balance])?;
+    let total_supply = create_accounts(&mut deps, &[main_balance])?;
 
     // store token info
     let data = TokenInfo {
@@ -38,56 +40,56 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         decimals: DECIMALS,
         total_supply,
     };
-    token_info(&mut deps.storage).save(&data)?;
+    TOKEN_INFO.save(deps.storage, &data)?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
-pub fn handle<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn execute(
+    deps: DepsMut,
     env: Env,
+    info: MessageInfo,
     msg: HandleMsg,
-) -> StdResult<HandleResponse> {
+) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::Transfer { recipient, amount } => handle_transfer(deps, env, recipient, amount),
+        HandleMsg::Transfer { recipient, amount } => {
+            execute_transfer(deps, env, info, recipient, amount)
+        }
         HandleMsg::TransferFrom {
             owner,
             recipient,
             amount,
-        } => handle_transfer_from(deps, env, owner, recipient, amount),
+        } => execute_transfer_from(deps, env, info, owner, recipient, amount),
         HandleMsg::Send {
             contract,
             amount,
             msg,
-        } => handle_send(deps, env, contract, amount, msg),
+        } => execute_send(deps, env, info, contract, amount, msg),
         HandleMsg::IncreaseAllowance {
             spender,
             amount,
             expires,
-        } => handle_increase_allowance(deps, env, spender, amount, expires),
+        } => execute_increase_allowance(deps, env, info, spender, amount, expires),
         HandleMsg::DecreaseAllowance {
             spender,
             amount,
             expires,
-        } => handle_decrease_allowance(deps, env, spender, amount, expires),
+        } => execute_decrease_allowance(deps, env, info, spender, amount, expires),
     }
 }
 
-pub fn query<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    msg: QueryMsg,
-) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)),
-        QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)),
-        QueryMsg::Allowance { owner, spender } => to_binary(&query_allowance(deps, owner, spender)),
+        QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
+        QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
+        QueryMsg::Allowance { owner, spender } => {
+            to_binary(&query_allowance(deps, owner, spender)?)
+        }
     }
 }
 
-pub fn query_token_info<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-) -> StdResult<TokenInfoResponse> {
-    let info = token_info_read(&deps.storage).load()?;
+pub fn query_token_info(deps: Deps) -> StdResult<TokenInfoResponse> {
+    let info = TOKEN_INFO.load(deps.storage)?;
 
     Ok(info.into())
 }
@@ -96,17 +98,18 @@ pub fn query_token_info<S: Storage, A: Api, Q: Querier>(
 mod tests {
     use super::*;
 
-    use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, HumanAddr, Uint128};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{coins, Uint128};
 
     #[test]
     fn test_query_token_info() {
-        let mut deps = mock_dependencies(10, &coins(2, "test_token"));
+        let mut deps = mock_dependencies(&coins(2, "test_token"));
 
-        let env = mock_env(&HumanAddr("creator".to_string()), &[]);
-        let _ = init(&mut deps, env, InitMsg {}).unwrap();
+        let env = mock_env();
+        let info = mock_info(&"creator", &[]);
+        let _ = instantiate(deps.as_mut(), env, info, InstantiateMsg {}).unwrap();
 
-        let query_res = query_token_info(&deps).unwrap();
+        let query_res = query_token_info(deps.as_ref()).unwrap();
 
         assert_eq!(
             query_res,
