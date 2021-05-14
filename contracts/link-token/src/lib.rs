@@ -1,4 +1,5 @@
 pub mod contract;
+mod integration_tests;
 pub mod msg;
 pub mod state;
 
