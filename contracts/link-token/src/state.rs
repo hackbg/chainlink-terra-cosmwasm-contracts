@@ -1,7 +1,7 @@
 use cw20::TokenInfoResponse;
 use cw_storage_plus::Item;
-use serde::{Deserialize, Serialize};
 use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::Uint128;
 
