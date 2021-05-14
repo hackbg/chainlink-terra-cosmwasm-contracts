@@ -1,3 +1,8 @@
+/*
+   OUTDATED
+   Testing approach changed. File will be removed.
+*/
+
 use cosmwasm_std::{
     from_binary, testing::MOCK_CONTRACT_ADDR, to_binary, ContractResult, Empty, Env, MessageInfo,
     Response, Uint128,
