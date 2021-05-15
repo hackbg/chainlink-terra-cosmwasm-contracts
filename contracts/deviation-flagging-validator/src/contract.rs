@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response,
-    StdResult, Uint128, WasmMsg,
+    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
+    WasmMsg,
 };
 
 use crate::error::ContractError;
@@ -23,7 +23,7 @@ pub fn instantiate(
         flagging_threshold: msg.flagging_threshold,
     };
 
-    config(deps.storage).save(&state)?;
+    CONFIG.save(deps.storage, &state)?;
     owned_init(deps, env, info, owned::msg::InstantiateMsg {})?;
 
     Ok(Response::default())
@@ -89,7 +89,7 @@ pub fn handle_validate(
     answer: Uint128,
 ) -> Result<Response, ContractError> {
     if !(is_valid(deps.as_ref(), previous_answer, answer)?) {
-        let flags = config_read(deps.storage).load()?.flags;
+        let flags = CONFIG.load(deps.storage)?.flags;
         let raise_flag_msg = WasmMsg::Execute {
             contract_addr: String::from(flags),
             msg: to_binary(&FlagsMsg::RaiseFlag {
@@ -120,9 +120,9 @@ pub fn handle_set_flags_address(
     flags: Addr,
 ) -> Result<Response, ContractError> {
     validate_ownership(deps.as_ref(), &env, info)?;
-    let previous = config_read(deps.storage).load()?.flags;
+    let previous = CONFIG.load(deps.storage)?.flags;
     if previous != flags {
-        config(deps.storage).update(|mut state| -> StdResult<_> {
+        CONFIG.update(deps.storage, |mut state| -> StdResult<_> {
             state.flags = flags.clone();
             Ok(state)
         })?;
@@ -147,10 +147,10 @@ pub fn handle_set_flagging_threshold(
     threshold: u32,
 ) -> Result<Response, ContractError> {
     validate_ownership(deps.as_ref(), &env, info)?;
-    let previous_ft = config_read(deps.storage).load()?.flagging_threshold;
+    let previous_ft = CONFIG.load(deps.storage)?.flagging_threshold;
 
     if previous_ft != threshold {
-        config(deps.storage).update(|mut state| -> StdResult<_> {
+        CONFIG.update(deps.storage, |mut state| -> StdResult<_> {
             state.flagging_threshold = threshold;
             Ok(state)
         })?;
@@ -182,7 +182,7 @@ fn is_valid(deps: Deps, previous_answer: Uint128, answer: Uint128) -> StdResult<
     if previous_answer == Uint128::zero() {
         Ok(true)
     } else {
-        let flagging_threshold = config_read(deps.storage).load()?.flagging_threshold;
+        let flagging_threshold = CONFIG.load(deps.storage)?.flagging_threshold;
         let change = previous_answer.u128() - answer.u128();
         let ratio_numerator = change * THRESHOLD_MULTIPLIER;
         let ratio = ratio_numerator / previous_answer.u128();
@@ -191,7 +191,7 @@ fn is_valid(deps: Deps, previous_answer: Uint128, answer: Uint128) -> StdResult<
 }
 
 pub fn query_flagging_threshold(deps: Deps) -> StdResult<FlaggingThresholdResponse> {
-    let flagging_threshold = config_read(deps.storage).load()?.flagging_threshold;
+    let flagging_threshold = CONFIG.load(deps.storage)?.flagging_threshold;
     Ok(FlaggingThresholdResponse {
         threshold: flagging_threshold,
     })
@@ -244,7 +244,7 @@ mod tests {
         let res = handle_set_flags_address(deps.as_mut(), mock_env(), info, new_flags.clone());
         assert_eq!(0, res.unwrap().messages.len());
 
-        let flag_addr = config_read(&deps.storage).load().unwrap().flags;
+        let flag_addr = CONFIG.load(&deps.storage).unwrap().flags;
         assert_eq!(new_flags, flag_addr);
     }
 
@@ -262,10 +262,11 @@ mod tests {
         let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let _threshold = handle_set_flagging_threshold(deps.as_mut(), mock_env(), info, 1000).unwrap();
+        let _threshold =
+            handle_set_flagging_threshold(deps.as_mut(), mock_env(), info, 1000).unwrap();
 
-        let threshold = config_read(&deps.storage)
-            .load()
+        let threshold = CONFIG
+            .load(&deps.storage)
             .unwrap()
             .flagging_threshold;
         assert_eq!(1000, threshold);
@@ -284,7 +285,6 @@ mod tests {
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
         assert_eq!(0, res.messages.len());
-
 
         let previous_answer = Uint128::from(100 as u64);
         let answer = Uint128::from(5 as u64);
