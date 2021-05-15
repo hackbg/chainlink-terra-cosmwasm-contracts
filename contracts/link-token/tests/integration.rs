@@ -18,7 +18,7 @@ use cw20::{AllowanceResponse, BalanceResponse, TokenInfoResponse};
 use cw20_base::ContractError;
 use link_token::{
     contract::{DECIMALS, TOKEN_NAME, TOKEN_SYMBOL, TOTAL_SUPPLY},
-    msg::{HandleMsg, InstantiateMsg, QueryMsg},
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -76,7 +76,7 @@ fn test_transfer_success() {
 
     let recipient_addr = MOCK_CONTRACT_ADDR;
 
-    let msg = HandleMsg::Transfer {
+    let msg = ExecuteMsg::Transfer {
         recipient: recipient_addr.to_owned(),
         amount: Uint128(128),
     };
@@ -94,7 +94,7 @@ fn test_transfer_underflow() {
     let balance = Uint128(TOTAL_SUPPLY);
     let amount = balance + Uint128(1);
 
-    let msg = HandleMsg::Transfer {
+    let msg = ExecuteMsg::Transfer {
         recipient: info.clone().sender.into(),
         amount,
     };
@@ -150,7 +150,7 @@ fn test_modify_allowance() {
     let owner_addr = info.clone().sender;
     let spender_addr = "spender";
 
-    let msg = HandleMsg::IncreaseAllowance {
+    let msg = ExecuteMsg::IncreaseAllowance {
         spender: spender_addr.to_owned(),
         amount: Uint128(100),
         expires: None,
@@ -164,7 +164,7 @@ fn test_modify_allowance() {
     let res = query(&mut deps, env.clone(), allowance_query).unwrap();
     let allowance: AllowanceResponse = from_binary(&res).unwrap();
 
-    let msg = HandleMsg::DecreaseAllowance {
+    let msg = ExecuteMsg::DecreaseAllowance {
         spender: spender_addr.to_owned(),
         amount: Uint128(50),
         expires: None,
@@ -192,7 +192,7 @@ fn test_transfer_from() {
     let recipient_addr = "recipient";
     let amount = Uint128(100);
 
-    let msg = HandleMsg::IncreaseAllowance {
+    let msg = ExecuteMsg::IncreaseAllowance {
         spender: spender_addr.into(),
         amount,
         expires: None,
@@ -209,7 +209,7 @@ fn test_transfer_from() {
     assert_eq!(allowance.allowance, amount);
 
     let info = mock_info(spender_addr, &[]);
-    let msg = HandleMsg::TransferFrom {
+    let msg = ExecuteMsg::TransferFrom {
         owner: owner_addr.clone(),
         recipient: recipient_addr.to_owned(),
         amount,
@@ -247,7 +247,7 @@ fn test_transfer_from_without_allowance() {
 
     assert_eq!(allowance.allowance, Uint128::zero());
 
-    let msg = HandleMsg::TransferFrom {
+    let msg = ExecuteMsg::TransferFrom {
         owner: owner_addr,
         recipient: recipient_addr.to_owned(),
         amount: Uint128(100),
@@ -264,7 +264,7 @@ fn test_change_allowance_self() {
 
     let owner_addr = info.sender.clone();
 
-    let msg = HandleMsg::IncreaseAllowance {
+    let msg = ExecuteMsg::IncreaseAllowance {
         spender: owner_addr.into(),
         amount: Uint128(1000),
         expires: None,
@@ -294,7 +294,7 @@ fn test_send() {
     })
     .unwrap();
 
-    let send_msg = HandleMsg::Send {
+    let send_msg = ExecuteMsg::Send {
         contract: contract_addr.to_owned(),
         amount,
         msg: payload,

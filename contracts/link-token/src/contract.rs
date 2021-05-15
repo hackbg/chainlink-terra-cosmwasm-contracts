@@ -12,7 +12,7 @@ use cw20_base::{
 };
 
 use crate::{
-    msg::{HandleMsg, InstantiateMsg, QueryMsg},
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     state::{TokenInfo, TOKEN_INFO},
 };
 
@@ -49,28 +49,28 @@ pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::Transfer { recipient, amount } => {
+        ExecuteMsg::Transfer { recipient, amount } => {
             execute_transfer(deps, env, info, recipient, amount)
         }
-        HandleMsg::TransferFrom {
+        ExecuteMsg::TransferFrom {
             owner,
             recipient,
             amount,
         } => execute_transfer_from(deps, env, info, owner, recipient, amount),
-        HandleMsg::Send {
+        ExecuteMsg::Send {
             contract,
             amount,
             msg,
         } => execute_send(deps, env, info, contract, amount, msg),
-        HandleMsg::IncreaseAllowance {
+        ExecuteMsg::IncreaseAllowance {
             spender,
             amount,
             expires,
         } => execute_increase_allowance(deps, env, info, spender, amount, expires),
-        HandleMsg::DecreaseAllowance {
+        ExecuteMsg::DecreaseAllowance {
             spender,
             amount,
             expires,

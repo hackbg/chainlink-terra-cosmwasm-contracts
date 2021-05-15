@@ -5,7 +5,7 @@ mod receiver_mock;
 use crate::{
     contract::{execute, instantiate, query, DECIMALS, TOKEN_NAME, TOKEN_SYMBOL, TOTAL_SUPPLY},
     integration_tests::receiver_mock::{contract_receiver_mock, MockInstantiateMsg, PingMsg},
-    msg::{HandleMsg, InstantiateMsg, QueryMsg},
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
 };
 use cosmwasm_std::{
     attr,
@@ -63,7 +63,7 @@ fn test_transfer_success() {
         .unwrap();
     let recipient_addr = MOCK_CONTRACT_ADDR;
 
-    let msg = HandleMsg::Transfer {
+    let msg = ExecuteMsg::Transfer {
         recipient: recipient_addr.to_owned(),
         amount: Uint128(128),
     };
@@ -92,7 +92,7 @@ fn test_transfer_underflow() {
     let balance = Uint128(TOTAL_SUPPLY);
     let amount = balance + Uint128(1);
 
-    let msg = HandleMsg::Transfer {
+    let msg = ExecuteMsg::Transfer {
         recipient: MOCK_CONTRACT_ADDR.into(),
         amount,
     };
@@ -169,7 +169,7 @@ fn test_modify_allowance() {
 
     let spender_addr = "spender";
 
-    let msg = HandleMsg::IncreaseAllowance {
+    let msg = ExecuteMsg::IncreaseAllowance {
         spender: spender_addr.to_owned(),
         amount: Uint128(100),
         expires: None,
@@ -187,7 +187,7 @@ fn test_modify_allowance() {
         .query_wasm_smart(contract.clone(), &allowance_query)
         .unwrap();
 
-    let msg = HandleMsg::DecreaseAllowance {
+    let msg = ExecuteMsg::DecreaseAllowance {
         spender: spender_addr.to_owned(),
         amount: Uint128(50),
         expires: None,
@@ -223,7 +223,7 @@ fn test_transfer_from() {
     let recipient = Addr::unchecked("recipient");
     let amount = Uint128(100);
 
-    let msg = HandleMsg::IncreaseAllowance {
+    let msg = ExecuteMsg::IncreaseAllowance {
         spender: spender.to_string(),
         amount,
         expires: None,
@@ -243,7 +243,7 @@ fn test_transfer_from() {
 
     assert_eq!(allowance.allowance, amount);
 
-    let msg = HandleMsg::TransferFrom {
+    let msg = ExecuteMsg::TransferFrom {
         owner: owner.to_string(),
         recipient: recipient.to_string(),
         amount,
@@ -297,7 +297,7 @@ fn test_transfer_from_without_allowance() {
         .unwrap();
     assert_eq!(allowance.allowance, Uint128::zero());
 
-    let msg = HandleMsg::TransferFrom {
+    let msg = ExecuteMsg::TransferFrom {
         owner: owner.to_string(),
         recipient: recipient.to_owned(),
         amount: Uint128(100),
@@ -316,7 +316,7 @@ fn test_change_allowance_self() {
         .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK")
         .unwrap();
 
-    let msg = HandleMsg::IncreaseAllowance {
+    let msg = ExecuteMsg::IncreaseAllowance {
         spender: owner.to_string(),
         amount: Uint128(1000),
         expires: None,
@@ -355,7 +355,7 @@ fn test_send() {
     })
     .unwrap();
 
-    let send_msg = HandleMsg::Send {
+    let send_msg = ExecuteMsg::Send {
         contract: receiver.to_string(),
         amount,
         msg: payload,
