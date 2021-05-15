@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, entry_point, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response,
-    StdResult,
+    attr, entry_point, to_binary, Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse,
+    Response,
 };
 
 use crate::error::ContractError;
@@ -41,7 +41,7 @@ pub fn execute(
 }
 
 #[entry_point]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<QueryResponse, ContractError> {
     match msg {
         QueryMsg::GetFlag { subject } => Ok(to_binary(&get_flag(deps, subject)?)?),
         QueryMsg::GetFlags { subjects } => Ok(to_binary(&get_flags(deps, subjects)?)?),
@@ -136,10 +136,8 @@ pub fn handle_set_raising_access_controller(
 ) -> Result<Response, ContractError> {
     validate_ownership(deps.as_ref(), &env, info)?;
     let prev_rac = config_read(deps.storage).load()?.raising_access_controller;
-    config(deps.storage).update(|_state| -> StdResult<_> {
-        Ok(State {
-            raising_access_controller: rac_address.clone(),
-        })
+    config(deps.storage).save(&State {
+        raising_access_controller: rac_address.clone(),
     })?;
     Ok(Response {
         submessages: vec![],
@@ -170,7 +168,7 @@ pub fn get_flags(deps: Deps, subjects: Vec<Addr>) -> Result<Vec<bool>, ContractE
     Ok(flags)
 }
 
-pub fn get_rac(deps: Deps) -> StdResult<Addr> {
+pub fn get_rac(deps: Deps) -> Result<Addr, ContractError> {
     let raising_access_controller = config_read(deps.storage).load()?.raising_access_controller;
     Ok(raising_access_controller)
 }
@@ -195,7 +193,7 @@ fn check_access(_deps: Deps) -> Result<(), ContractError> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Addr, Api};
+    use cosmwasm_std::{coins, Api};
 
     #[test]
     fn proper_initialization() {
