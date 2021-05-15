@@ -8,7 +8,7 @@ use crate::msg::*;
 use crate::state::*;
 
 use flags::msg::ExecuteMsg as FlagsMsg;
-use owned::contract::{get_owner, handle_accept_ownership, instantiate as owned_init};
+use owned::contract::{get_owner, try_accept_ownership, instantiate as owned_init};
 
 static THRESHOLD_MULTIPLIER: u128 = 100000;
 
@@ -36,16 +36,16 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::SetFlagsAddress { flags } => handle_set_flags_address(deps, env, info, flags),
+        ExecuteMsg::SetFlagsAddress { flags } => try_set_flags_address(deps, env, info, flags),
         ExecuteMsg::SetFlaggingThreshold { threshold } => {
-            handle_set_flagging_threshold(deps, env, info, threshold)
+            try_set_flagging_threshold(deps, env, info, threshold)
         }
         ExecuteMsg::Validate {
             previous_round_id,
             previous_answer,
             round_id,
             answer,
-        } => handle_validate(
+        } => try_validate(
             deps,
             env,
             info,
@@ -54,17 +54,17 @@ pub fn execute(
             round_id,
             answer,
         ),
-        ExecuteMsg::TransferOwnership { to } => handle_transfer_ownership(deps, env, info, to),
-        ExecuteMsg::AcceptOwnership {} => handle_owned_accept_ownership(deps, env, info),
+        ExecuteMsg::TransferOwnership { to } => try_transfer_ownership(deps, env, info, to),
+        ExecuteMsg::AcceptOwnership {} => try_owned_accept_ownership(deps, env, info),
     }
 }
 
-fn handle_owned_accept_ownership(
+fn try_owned_accept_ownership(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
-    let res = handle_accept_ownership(deps, env, info)?;
+    let res = try_accept_ownership(deps, env, info)?;
     Ok(res)
 }
 
@@ -79,7 +79,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-pub fn handle_validate(
+pub fn try_validate(
     deps: DepsMut,
     env: Env,
     _info: MessageInfo,
@@ -113,7 +113,7 @@ pub fn handle_validate(
     }
 }
 
-pub fn handle_set_flags_address(
+pub fn try_set_flags_address(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -140,7 +140,7 @@ pub fn handle_set_flags_address(
     })
 }
 
-pub fn handle_set_flagging_threshold(
+pub fn try_set_flagging_threshold(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -168,13 +168,13 @@ pub fn handle_set_flagging_threshold(
     })
 }
 
-pub fn handle_transfer_ownership(
+pub fn try_transfer_ownership(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     to: Addr,
 ) -> Result<Response, ContractError> {
-    let owned_res = owned::contract::handle_transfer_ownership(deps, env, info, to)?;
+    let owned_res = owned::contract::try_transfer_ownership(deps, env, info, to)?;
     Ok(owned_res)
 }
 
@@ -241,7 +241,7 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         let new_flags = deps.api.addr_validate("new_flags").unwrap();
-        let res = handle_set_flags_address(deps.as_mut(), mock_env(), info, new_flags.clone());
+        let res = try_set_flags_address(deps.as_mut(), mock_env(), info, new_flags.clone());
         assert_eq!(0, res.unwrap().messages.len());
 
         let flag_addr = CONFIG.load(&deps.storage).unwrap().flags;
@@ -263,7 +263,7 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         let _threshold =
-            handle_set_flagging_threshold(deps.as_mut(), mock_env(), info, 1000).unwrap();
+            try_set_flagging_threshold(deps.as_mut(), mock_env(), info, 1000).unwrap();
 
         let threshold = CONFIG
             .load(&deps.storage)
