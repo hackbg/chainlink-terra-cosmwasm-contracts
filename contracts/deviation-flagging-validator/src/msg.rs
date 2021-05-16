@@ -1,11 +1,11 @@
-use cosmwasm_std::{HumanAddr, Uint128};
+use cosmwasm_std::{Addr, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InitMsg {
+pub struct InstantiateMsg {
     /// The address of the flags contract
-    pub flags: HumanAddr,
+    pub flags: Addr,
     /// The threshold that will trigger a flag to be raised
     /// Setting the value of 100,000 is equivalent to tolerating a 100% change
     /// compared to the previous price
@@ -14,21 +14,21 @@ pub struct InitMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum HandleMsg {
+pub enum ExecuteMsg {
     /// Initiate contract ownership transfer to another address.
     /// Can be used only by owner
     TransferOwnership {
         /// Address to transfer ownership to
-        to: HumanAddr,
+        to: Addr,
     },
     /// Finish contract ownership transfer. Can be used only by pending owner
     AcceptOwnership {},
-    /// Upates the flagging threshold
+    /// Updates the flagging threshold
     /// Can be used only by owner
     SetFlaggingThreshold { threshold: u32 },
     /// Updates the flagging contract address for raising flags
     /// Can be used only by owner
-    SetFlagsAddress { flags: HumanAddr },
+    SetFlagsAddress { flags: Addr },
     /// Checks whether the parameters count as valid by comparing the difference
     /// change to the flagging threshold
     Validate {
@@ -48,7 +48,7 @@ pub enum HandleMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    /// Check whethere the parameters count is valid by comparing the difference
+    /// Check whether the parameters count is valid by comparing the difference
     /// change to the flagging threshold
     /// Response: [`bool`]
     IsValid {
@@ -63,6 +63,11 @@ pub enum QueryMsg {
     /// Response: [`u32`]
     GetFlaggingThreshold {},
     /// Returns contract owner's address
-    /// Response [`HumanAddr`]
+    /// Response [`Addr`]
     GetOwner {},
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct FlaggingThresholdResponse {
+    pub threshold: u32,
 }
