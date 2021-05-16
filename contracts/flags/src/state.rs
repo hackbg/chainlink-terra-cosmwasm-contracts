@@ -1,31 +1,24 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{HumanAddr, Storage};
-use cosmwasm_storage::{
-    bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
-    Singleton,
-};
+use cosmwasm_std::{Addr, Storage};
+use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
+use cw_storage_plus::Map;
+
 pub static CONFIG_KEY: &[u8] = b"config";
 pub static FLAG_KEY: &[u8] = b"flags";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
-    pub raising_access_controller: HumanAddr,
+    pub raising_access_controller: Addr,
 }
 
-pub fn config<S: Storage>(storage: &mut S) -> Singleton<S, State> {
+pub fn config(storage: &mut dyn Storage) -> Singleton<State> {
     singleton(storage, CONFIG_KEY)
 }
 
-pub fn config_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, State> {
+pub fn config_read(storage: &dyn Storage) -> ReadonlySingleton<State> {
     singleton_read(storage, CONFIG_KEY)
 }
 
-pub fn flags<S: Storage>(storage: &mut S) -> Bucket<S, bool> {
-    bucket(&FLAG_KEY, storage)
-}
-
-pub fn flags_read<S: Storage>(storage: &S) -> ReadonlyBucket<S, bool> {
-    bucket_read(&FLAG_KEY, storage)
-}
+pub const FLAGS: Map<&Addr, bool> = Map::new("flags");
