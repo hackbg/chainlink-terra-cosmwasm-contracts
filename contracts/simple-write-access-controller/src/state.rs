@@ -1,8 +1,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, Storage};
-use cw_storage_plus::{Map, Item};
+use cosmwasm_std::Addr;
+use cw_storage_plus::{Item, Map};
 
 pub static CONFIG_KEY: &[u8] = b"config";
 

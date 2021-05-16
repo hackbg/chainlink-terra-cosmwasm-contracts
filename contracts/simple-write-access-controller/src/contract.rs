@@ -1,28 +1,28 @@
-use std::thread::AccessError;
-
 use cosmwasm_std::{
-    entry_point, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, attr
+    attr, entry_point, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response,
+    StdResult,
 };
 
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{CONFIG, ACCESS_LIST, State};
 use crate::error::ContractError;
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::state::{State, ACCESS_LIST, CONFIG};
 
-use owned::contract::{execute_accept_ownership, get_owner, instantiate as owned_init};
+use owned::contract::{get_owner, instantiate as owned_init};
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
+    env: Env,
+    info: MessageInfo,
     _msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     let state = State {
         check_enabled: true,
     };
     CONFIG.save(deps.storage, &state)?;
+    owned_init(deps, env, info, owned::msg::InstantiateMsg {})?;
 
     Ok(Response::default())
 }
@@ -36,19 +36,20 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::AddAccess { user } => Ok(execute_add_access(deps, env, info, user)?),
-        ExecuteMsg::RemoveAccess { user } => Ok(execute_remove_access(deps, env, info, user)?),
-        ExecuteMsg::EnableAccessCheck {} => Ok(execute_enable_access_check(deps, env, info)?),
-        ExecuteMsg::DisableAccessCheck {} => Ok(execute_disable_access_check(deps,env, info)?),
+        ExecuteMsg::AddAccess { user } => execute_add_access(deps, env, info, user),
+        ExecuteMsg::RemoveAccess { user } => execute_remove_access(deps, env, info, user),
+        ExecuteMsg::EnableAccessCheck {} => execute_enable_access_check(deps, env, info),
+        ExecuteMsg::DisableAccessCheck {} => execute_disable_access_check(deps, env, info),
     }
 }
 
 pub fn execute_add_access(
     deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
+    env: Env,
+    info: MessageInfo,
     user: Addr,
-) -> StdResult<Response> {
+) -> Result<Response, ContractError> {
+    validate_ownership(deps.as_ref(), &env, info)?;
     let may_have_access = ACCESS_LIST.may_load(deps.storage, &user)?;
     if may_have_access.is_none() {
         ACCESS_LIST.save(deps.storage, &user, &true)?;
@@ -56,20 +57,18 @@ pub fn execute_add_access(
     Ok(Response {
         submessages: vec![],
         messages: vec![],
-        attributes: vec![
-            attr("action", "added access"),
-            attr("user", user)
-        ],
+        attributes: vec![attr("action", "added access"), attr("user", user)],
         data: None,
     })
 }
 
 pub fn execute_remove_access(
     deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
+    env: Env,
+    info: MessageInfo,
     user: Addr,
-) -> StdResult<Response> {
+) -> Result<Response, ContractError> {
+    validate_ownership(deps.as_ref(), &env, info)?;
     let may_have_access = ACCESS_LIST.may_load(deps.storage, &user)?;
     if may_have_access.is_some() {
         ACCESS_LIST.update(deps.storage, &user, |_user: Option<bool>| -> StdResult<_> {
@@ -79,15 +78,17 @@ pub fn execute_remove_access(
     Ok(Response {
         submessages: vec![],
         messages: vec![],
-        attributes: vec![
-            attr("action", "removed access"),
-            attr("user", user)
-        ],
+        attributes: vec![attr("action", "removed access"), attr("user", user)],
         data: None,
     })
 }
 
-pub fn execute_enable_access_check(deps: DepsMut, _env: Env, _info: MessageInfo) -> StdResult<Response> {
+pub fn execute_enable_access_check(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+    validate_ownership(deps.as_ref(), &env, info)?;
     let check = CONFIG.load(deps.storage)?.check_enabled;
     if !check {
         CONFIG.update(deps.storage, |_state| -> StdResult<_> {
@@ -99,18 +100,17 @@ pub fn execute_enable_access_check(deps: DepsMut, _env: Env, _info: MessageInfo)
     Ok(Response {
         submessages: vec![],
         messages: vec![],
-        attributes: vec![
-            attr("action", "enable access check"),
-        ],
+        attributes: vec![attr("action", "enable access check")],
         data: None,
     })
 }
 
 pub fn execute_disable_access_check(
     deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-) -> StdResult<Response> {
+    env: Env,
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+    validate_ownership(deps.as_ref(), &env, info)?;
     let check = CONFIG.load(deps.storage)?.check_enabled;
     if check {
         CONFIG.update(deps.storage, |_state| -> StdResult<_> {
@@ -122,9 +122,7 @@ pub fn execute_disable_access_check(
     Ok(Response {
         submessages: vec![],
         messages: vec![],
-        attributes: vec![
-            attr("action", "disable access check")
-        ],
+        attributes: vec![attr("action", "disable access check")],
         data: None,
     })
 }
@@ -157,7 +155,6 @@ fn validate_ownership(deps: Deps, _env: &Env, info: MessageInfo) -> Result<(), C
     }
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {
