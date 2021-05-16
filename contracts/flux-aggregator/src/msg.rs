@@ -1,19 +1,19 @@
-use cosmwasm_std::{HumanAddr, Uint128};
+use cosmwasm_std::{Addr, Uint128};
 use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InitMsg {
+pub struct InstantiateMsg {
     /// LINK token address
-    pub link: HumanAddr,
+    pub link: String,
     /// Amount of LINK paid to each oracle per submission
     pub payment_amount: Uint128,
     /// The number of seconds after the previous round that are
     /// allowed to lapse before allowing an oracle to skip an unfinished round
     pub timeout: u32,
     /// Address to external data validation
-    pub validator: HumanAddr,
+    pub validator: String,
     /// An immutable check for a lower bound of what
     /// submission values are accepted from an oracle
     pub min_submission_value: Uint128, // int256
@@ -28,12 +28,12 @@ pub struct InitMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum HandleMsg {
+pub enum ExecuteMsg {
     /// Initiate contract ownership transfer to another address.
     /// Can be used only by owner
     TransferOwnership {
         /// Address to transfer ownership to
-        to: HumanAddr,
+        to: String,
     },
     /// Finish contract ownership transfer. Can be used only by pending owner
     AcceptOwnership {},
@@ -48,11 +48,11 @@ pub enum HandleMsg {
     /// update the round related parameters that pertain to total oracle count
     ChangeOracles {
         /// Oracles to be removed
-        removed: Vec<HumanAddr>,
+        removed: Vec<String>,
         /// Oracles to be added
-        added: Vec<HumanAddr>,
+        added: Vec<String>,
         /// Admins to be added. Only this address is allowed to access the respective oracle's funds
-        added_admins: Vec<HumanAddr>,
+        added_admins: Vec<String>,
         /// The new minimum submission count for each round
         min_submissions: u32,
         /// The new maximum submission count for each round
@@ -63,30 +63,30 @@ pub enum HandleMsg {
     /// Transfer LINK from oracle to another address. Callable only by oracle's admin
     WithdrawPayment {
         /// Oracle whose LINK is to be transferred
-        oracle: HumanAddr,
+        oracle: String,
         /// Transfer recipient
-        recipient: HumanAddr,
+        recipient: String,
         /// Amount of LINK to be send
         amount: Uint128, // uint256
     },
     /// Transfers the contract owner's LINK to another address
     WithdrawFunds {
         /// Recipient address
-        recipient: HumanAddr,
+        recipient: String,
         /// LINK to be sent
         amount: Uint128, // uint256
     },
     /// Transfer admin address for an oracle
     TransferAdmin {
         /// The oracle adddress whose admin is being transferred
-        oracle: HumanAddr,
+        oracle: String,
         /// New admin address
-        new_admin: HumanAddr,
+        new_admin: String,
     },
     /// Accept the pending admin transfer for an oracle
     AcceptAdmin {
         /// Address of the oracle whose admin is being transfered
-        oracle: HumanAddr,
+        oracle: String,
     },
     /// Allows non-oracles to request a new round.
     /// Response contains the new `round_id` ([`u32`]).
@@ -94,7 +94,7 @@ pub enum HandleMsg {
     /// Allows/disallows non-oracles to start new rounds. Callable only by contract owner
     SetRequesterPermissions {
         /// Address to set permission for
-        requester: HumanAddr,
+        requester: String,
         /// Is requester authorized
         authorized: bool,
         /// The number of rounds the requester must wait before starting another round
@@ -118,7 +118,7 @@ pub enum HandleMsg {
     /// Updates the address which does external data validation
     SetValidator {
         /// Address of the new validation contract
-        validator: HumanAddr,
+        validator: String,
     },
     /// Handler for LINK token Send message
     Receive(Cw20ReceiveMsg),
@@ -128,7 +128,7 @@ pub enum HandleMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /// Returns contract owner's address
-    /// Response [`HumanAddr`]
+    /// Response [`String`]
     GetOwner {},
     /// Returns the settings of the flux aggregator
     /// Response: [`ConfigResponse`]
@@ -143,19 +143,19 @@ pub enum QueryMsg {
     /// Response: [`Uint128`].
     GetWithdrawablePayment {
         /// Address of the Oracle which is query for
-        oracle: HumanAddr,
+        oracle: String,
     },
     /// Query the number of oracles
     /// Response: [`u8`].
     GetOracleCount {},
     /// Query for the addresses of the oracles on the contract
-    /// Response: [`Vec<HumanAddr>`].
+    /// Response: [`Vec<String>`].
     GetOracles {},
     /// Get the admin address of a specific Oracle
-    /// Response: [`HumanAddr`].
+    /// Response: [`String`].
     GetAdmin {
         /// The address of the oracle whose admin is being queried
-        oracle: HumanAddr,
+        oracle: String,
     },
     /// Query data for a specific round
     /// Response: [`RoundDataResponse`].
@@ -170,7 +170,7 @@ pub enum QueryMsg {
     /// Response: [`OracleRoundStateResponse`].
     GetOracleRoundState {
         /// Oracle address to look up for
-        oracle: HumanAddr,
+        oracle: String,
         /// Round for which to look up
         queried_round_id: u32,
     },
@@ -178,8 +178,8 @@ pub enum QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
-    pub link: HumanAddr,
-    pub validator: HumanAddr,
+    pub link: Addr,
+    pub validator: Addr,
     pub payment_amount: Uint128,
     pub max_submission_count: u32,
     pub min_submission_count: u32,

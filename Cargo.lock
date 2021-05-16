@@ -487,7 +487,7 @@ checksum = "e6a963810dcd19730f0e4d61ee27d41fbc61ed6835c3266c6df80c9f84ab75b5"
 dependencies = [
  "cosmwasm-std 0.14.0",
  "cw-storage-plus",
- "cw0 0.6.0",
+ "cw0",
  "schemars 0.8.3",
  "serde",
 ]
@@ -500,17 +500,6 @@ checksum = "9b427ab9149bbc8ef9535ba66ae3c6595215710b9e2081167517845e12d38013"
 dependencies = [
  "cosmwasm-std 0.14.0",
  "schemars 0.8.3",
- "serde",
-]
-
-[[package]]
-name = "cw0"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b469bb5d63a036339cbb3042fb1254016b5d4889b15f420fea1c1339497b19de"
-dependencies = [
- "cosmwasm-std 0.10.1",
- "schemars 0.7.6",
  "serde",
 ]
 
@@ -540,24 +529,12 @@ dependencies = [
 
 [[package]]
 name = "cw20"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffd85ddcac2bf5c1899dd13e52985d260dae02db21a618d9d4c2c36dab63a915"
-dependencies = [
- "cosmwasm-std 0.10.1",
- "cw0 0.2.3",
- "schemars 0.7.6",
- "serde",
-]
-
-[[package]]
-name = "cw20"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58d1ba85ecbb83e0ec8a19672eb31f241ae3d943c5f268c311d8d407a3155f9f"
 dependencies = [
  "cosmwasm-std 0.14.0",
- "cw0 0.6.0",
+ "cw0",
  "schemars 0.8.3",
  "serde",
 ]
@@ -570,9 +547,9 @@ checksum = "20909b6d067163ece05e199774d7f913467794e51ab7c15d69c0c300d121deca"
 dependencies = [
  "cosmwasm-std 0.14.0",
  "cw-storage-plus",
- "cw0 0.6.0",
+ "cw0",
  "cw2",
- "cw20 0.6.0",
+ "cw20",
  "schemars 0.8.3",
  "serde",
  "thiserror",
@@ -856,16 +833,17 @@ dependencies = [
 name = "flux-aggregator"
 version = "0.1.0"
 dependencies = [
- "cosmwasm-schema 0.10.1",
- "cosmwasm-std 0.10.1",
- "cosmwasm-storage 0.10.1",
- "cosmwasm-vm 0.10.1",
- "cw20 0.2.3",
+ "cosmwasm-schema 0.14.0",
+ "cosmwasm-std 0.14.0",
+ "cosmwasm-storage 0.14.0",
+ "cosmwasm-vm 0.14.0",
+ "cw-multi-test",
+ "cw-storage-plus",
+ "cw20",
  "link-token",
  "owned",
- "schemars 0.7.6",
+ "schemars 0.8.3",
  "serde",
- "snafu",
  "thiserror",
  "utils",
 ]
@@ -1061,7 +1039,7 @@ dependencies = [
  "cosmwasm-vm 0.14.0",
  "cw-multi-test",
  "cw-storage-plus",
- "cw20 0.6.0",
+ "cw20",
  "cw20-base",
  "schemars 0.8.3",
  "serde",
@@ -1812,7 +1790,7 @@ name = "utils"
 version = "0.1.0"
 dependencies = [
  "num-traits",
- "schemars 0.7.6",
+ "schemars 0.8.3",
  "serde",
  "snafu",
 ]
