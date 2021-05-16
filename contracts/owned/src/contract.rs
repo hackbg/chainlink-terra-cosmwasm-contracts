@@ -30,8 +30,8 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::TransferOwnership { to } => try_transfer_ownership(deps, env, info, to),
-        ExecuteMsg::AcceptOwnership {} => try_accept_ownership(deps, env, info),
+        ExecuteMsg::TransferOwnership { to } => execute_transfer_ownership(deps, env, info, to),
+        ExecuteMsg::AcceptOwnership {} => execute_accept_ownership(deps, env, info),
     }
 }
 
@@ -41,7 +41,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<QueryResponse> {
     }
 }
 
-pub fn try_transfer_ownership(
+pub fn execute_transfer_ownership(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -76,7 +76,7 @@ fn transfer_ownership(deps: DepsMut, _env: Env, to: Addr) -> Result<Vec<Attribut
     ])
 }
 
-pub fn try_accept_ownership(
+pub fn execute_accept_ownership(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -156,7 +156,7 @@ mod tests {
         let mock_addr = deps.api.addr_validate(MOCK_CONTRACT_ADDR).unwrap();
 
         let res =
-            try_transfer_ownership(deps.as_mut(), mock_env(), info, mock_addr.clone()).unwrap();
+            execute_transfer_ownership(deps.as_mut(), mock_env(), info, mock_addr.clone()).unwrap();
         assert_eq!(0, res.messages.len());
 
         let res = owner_read(&deps.storage)
@@ -182,7 +182,7 @@ mod tests {
         let mock_addr = deps.api.addr_validate(MOCK_CONTRACT_ADDR).unwrap();
 
         let res =
-            try_transfer_ownership(deps.as_mut(), mock_env(), info, mock_addr.clone()).unwrap();
+            execute_transfer_ownership(deps.as_mut(), mock_env(), info, mock_addr.clone()).unwrap();
         assert_eq!(0, res.messages.len());
 
         let res = owner_read(deps.as_ref().storage)

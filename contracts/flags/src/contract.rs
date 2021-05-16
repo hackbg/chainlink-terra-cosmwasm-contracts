@@ -1,6 +1,5 @@
 use cosmwasm_std::{
-    attr, entry_point, to_binary, Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse,
-    Response,
+    attr, entry_point, to_binary, Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Response,
 };
 
 use crate::error::ContractError;
@@ -31,11 +30,11 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::RaiseFlag { subject } => handle_raise_flag(deps, env, info, subject),
-        ExecuteMsg::RaiseFlags { subjects } => handle_raise_flags(deps, env, info, subjects),
-        ExecuteMsg::LowerFlags { subjects } => handle_lower_flags(deps, env, info, subjects),
+        ExecuteMsg::RaiseFlag { subject } => execute_raise_flag(deps, env, info, subject),
+        ExecuteMsg::RaiseFlags { subjects } => execute_raise_flags(deps, env, info, subjects),
+        ExecuteMsg::LowerFlags { subjects } => execute_lower_flags(deps, env, info, subjects),
         ExecuteMsg::SetRaisingAccessController { rac_address } => {
-            handle_set_raising_access_controller(deps, env, info, rac_address)
+            execute_set_raising_access_controller(deps, env, info, rac_address)
         }
     }
 }
@@ -49,7 +48,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<QueryResponse, Cont
     }
 }
 
-pub fn handle_raise_flag(
+pub fn execute_raise_flag(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
@@ -77,7 +76,7 @@ pub fn handle_raise_flag(
     }
 }
 
-pub fn handle_raise_flags(
+pub fn execute_raise_flags(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
@@ -105,7 +104,7 @@ pub fn handle_raise_flags(
     })
 }
 
-pub fn handle_lower_flags(
+pub fn execute_lower_flags(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -128,7 +127,7 @@ pub fn handle_lower_flags(
     })
 }
 
-pub fn handle_set_raising_access_controller(
+pub fn execute_set_raising_access_controller(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -261,7 +260,7 @@ mod tests {
         let info = mock_info("human", &[]);
         let addr = info.sender.clone();
 
-        let _res = handle_raise_flags(deps.as_mut(), mock_env(), info.clone(), vec![addr.clone()]);
+        let _res = execute_raise_flags(deps.as_mut(), mock_env(), info.clone(), vec![addr.clone()]);
 
         let flags = get_flags(deps.as_ref(), vec![addr.clone()]);
         assert_eq!(vec![true], flags.unwrap());
