@@ -1,21 +1,23 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "State",
+  "title": "InstantiateMsg",
   "type": "object",
   "required": [
-    "owner"
+    "flagging_threshold",
+    "flags"
   ],
   "properties": {
-    "owner": {
-      "$ref": "#/definitions/Addr"
+    "flagging_threshold": {
+      "description": "The threshold that will trigger a flag to be raised Setting the value of 100,000 is equivalent to tolerating a 100% change compared to the previous price",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
     },
-    "pending_owner": {
-      "anyOf": [
+    "flags": {
+      "description": "The address of the flags contract",
+      "allOf": [
         {
           "$ref": "#/definitions/Addr"
-        },
-        {
-          "type": "null"
         }
       ]
     }

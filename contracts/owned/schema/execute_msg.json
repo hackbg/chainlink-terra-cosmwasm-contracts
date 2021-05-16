@@ -1,20 +1,20 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "QueryMsg",
+  "title": "ExecuteMsg",
   "anyOf": [
     {
       "type": "object",
       "required": [
-        "get_flag"
+        "transfer_ownership"
       ],
       "properties": {
-        "get_flag": {
+        "transfer_ownership": {
           "type": "object",
           "required": [
-            "subject"
+            "to"
           ],
           "properties": {
-            "subject": {
+            "to": {
               "$ref": "#/definitions/Addr"
             }
           }
@@ -25,33 +25,10 @@
     {
       "type": "object",
       "required": [
-        "get_flags"
+        "accept_ownership"
       ],
       "properties": {
-        "get_flags": {
-          "type": "object",
-          "required": [
-            "subjects"
-          ],
-          "properties": {
-            "subjects": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/Addr"
-              }
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "get_rac"
-      ],
-      "properties": {
-        "get_rac": {
+        "accept_ownership": {
           "type": "object"
         }
       },
