@@ -817,6 +817,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
+name = "oracle"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema 0.10.1",
+ "cosmwasm-std 0.10.1",
+ "cosmwasm-storage 0.10.1",
+ "schemars 0.7.6",
+ "serde",
+ "snafu",
+]
+
+[[package]]
 name = "owned"
 version = "0.1.0"
 dependencies = [
@@ -1125,6 +1137,7 @@ dependencies = [
  "cosmwasm-std 0.14.0",
  "cosmwasm-storage 0.14.0",
  "cw-storage-plus",
+ "owned",
  "schemars 0.8.3",
  "serde",
  "thiserror",
