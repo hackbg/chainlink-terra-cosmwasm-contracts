@@ -1,9 +1,9 @@
 use cw20::TokenInfoResponse;
+use cw_storage_plus::Item;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{ReadonlyStorage, Storage, Uint128};
-use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
+use cosmwasm_std::Uint128;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -25,12 +25,4 @@ impl From<TokenInfo> for TokenInfoResponse {
     }
 }
 
-pub static TOKEN_INFO_KEY: &[u8] = b"token_info";
-
-pub fn token_info<S: Storage>(storage: &mut S) -> Singleton<S, TokenInfo> {
-    singleton(storage, TOKEN_INFO_KEY)
-}
-
-pub fn token_info_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, TokenInfo> {
-    singleton_read(storage, TOKEN_INFO_KEY)
-}
+pub const TOKEN_INFO: Item<TokenInfo> = Item::new("token_info");
