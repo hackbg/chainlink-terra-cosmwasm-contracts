@@ -3,7 +3,7 @@
   "title": "QueryMsg",
   "anyOf": [
     {
-      "description": "Returns contract owner's address Response [`String`]",
+      "description": "Returns contract owner's address Response [`Addr`]",
       "type": "object",
       "required": [
         "get_owner"
@@ -90,7 +90,7 @@
       "additionalProperties": false
     },
     {
-      "description": "Query for the addresses of the oracles on the contract Response: [`Vec<String>`].",
+      "description": "Query for the addresses of the oracles on the contract Response: [`Vec<Addr>`].",
       "type": "object",
       "required": [
         "get_oracles"
@@ -103,7 +103,7 @@
       "additionalProperties": false
     },
     {
-      "description": "Get the admin address of a specific Oracle Response: [`String`].",
+      "description": "Get the admin address of a specific Oracle Response: [`Addr`].",
       "type": "object",
       "required": [
         "get_admin"
