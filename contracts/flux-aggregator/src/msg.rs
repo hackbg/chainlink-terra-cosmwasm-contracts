@@ -128,7 +128,7 @@ pub enum ExecuteMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /// Returns contract owner's address
-    /// Response [`String`]
+    /// Response [`Addr`]
     GetOwner {},
     /// Returns the settings of the flux aggregator
     /// Response: [`ConfigResponse`]
@@ -149,10 +149,10 @@ pub enum QueryMsg {
     /// Response: [`u8`].
     GetOracleCount {},
     /// Query for the addresses of the oracles on the contract
-    /// Response: [`Vec<String>`].
+    /// Response: [`Vec<Addr>`].
     GetOracles {},
     /// Get the admin address of a specific Oracle
-    /// Response: [`String`].
+    /// Response: [`Addr`].
     GetAdmin {
         /// The address of the oracle whose admin is being queried
         oracle: String,

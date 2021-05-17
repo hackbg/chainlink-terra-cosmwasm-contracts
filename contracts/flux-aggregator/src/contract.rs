@@ -255,7 +255,7 @@ pub fn execute_submit(
         ]);
 
         // TODO: send new value to validator
-        // messages.push(FlaggingValidatorMsg::ValidateAnwer)
+        // messages.push(FlaggingValidatorMsg::ValidateAnswer)
     }
     // pay oracle
     let payment = round_details.payment_amount;
@@ -411,6 +411,8 @@ pub fn execute_change_oracles(
 ) -> Result<Response, ContractError> {
     validate_ownership(deps.as_ref(), &info)?;
 
+    let mut attributes = vec![];
+
     for oracle in removed {
         let oracle = deps.api.addr_validate(&oracle)?;
         remove_oracle(deps.storage, oracle)?;
@@ -436,22 +438,23 @@ pub fn execute_change_oracles(
         timeout,
         ..
     } = CONFIG.load(deps.storage)?;
-    let msg = WasmMsg::Execute {
-        contract_addr: env.contract.address.to_string(),
-        msg: to_binary(&ExecuteMsg::UpdateFutureRounds {
-            payment_amount,
-            min_submissions,
-            max_submissions,
-            restart_delay,
-            timeout,
-        })?,
-        send: vec![],
-    };
+
+    let res = execute_update_future_rounds(
+        deps,
+        env,
+        info,
+        payment_amount,
+        min_submissions,
+        max_submissions,
+        restart_delay,
+        timeout,
+    )?;
+    attributes.extend_from_slice(&res.attributes);
 
     Ok(Response {
-        messages: vec![msg.into()],
+        messages: vec![],
         submessages: vec![],
-        attributes: vec![], // TODO: add logs
+        attributes, // TODO: add more logs
         data: None,
     })
 }
@@ -731,6 +734,21 @@ pub fn execute_withdraw_funds(
     Ok(Response {
         messages: vec![transfer_msg.into(), update_funds_msg.into()],
         submessages: vec![],
+        // TODO: assess if submessages would be an improvement here
+        // submessages: vec![
+        //     SubMsg {
+        //         id: 0,
+        //         msg: transfer_msg.into(),
+        //         gas_limit: None,
+        //         reply_on: ReplyOn::Always,
+        //     },
+        //     SubMsg {
+        //         id: 1,
+        //         msg: update_funds_msg.into(),
+        //         gas_limit: None,
+        //         reply_on: ReplyOn::Always,
+        //     },
+        // ],
         attributes: vec![],
         data: None,
     })
