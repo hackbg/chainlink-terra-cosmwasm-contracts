@@ -600,6 +600,7 @@ dependencies = [
  "cw-multi-test",
  "cw-storage-plus",
  "cw20",
+ "deviation-flagging-validator",
  "link-token",
  "owned",
  "schemars 0.8.3",

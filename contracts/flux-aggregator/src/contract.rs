@@ -1,8 +1,9 @@
 use cosmwasm_std::{
-    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, OverflowError,
+    attr, to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, OverflowError,
     OverflowOperation, Response, StdError, StdResult, Storage, Timestamp, Uint128, WasmMsg,
 };
 use cw20::{BalanceResponse, Cw20ReceiveMsg};
+use deviation_flagging_validator::msg::ExecuteMsg as ValidatorMsg;
 use link_token::msg::{ExecuteMsg as LinkMsg, QueryMsg as LinkQuery};
 use owned::contract::{get_owner, instantiate as owned_init};
 use utils::median::calculate_median;
@@ -154,6 +155,7 @@ pub fn execute_submit(
         restart_delay,
         timeout,
         payment_amount,
+        validator,
         ..
     } = CONFIG.load(deps.storage)?;
     if submission < min_submission_value {
@@ -162,7 +164,7 @@ pub fn execute_submit(
     if submission > max_submission_value {
         return Err(ContractError::OverMax {});
     }
-    let messages = vec![];
+    let mut messages: Vec<CosmosMsg> = vec![];
     let mut attributes = vec![];
     let timestamp = timestamp_to_seconds(env.block.time);
 
@@ -254,8 +256,22 @@ pub fn execute_submit(
             attr("round_id", round_id),
         ]);
 
-        // TODO: send new value to validator
-        // messages.push(FlaggingValidatorMsg::ValidateAnswer)
+        let previous_round_id = prev_round_id(round_id)?;
+        let prev_round = ROUNDS.load(deps.storage, previous_round_id.into())?;
+        // Send value to validator
+        messages.push(
+            WasmMsg::Execute {
+                contract_addr: validator.to_string(),
+                msg: to_binary(&ValidatorMsg::Validate {
+                    previous_round_id,
+                    previous_answer: prev_round.answer.unwrap_or_default(),
+                    round_id,
+                    answer: Uint128(new_answer),
+                })?,
+                send: vec![],
+            }
+            .into(),
+        );
     }
     // pay oracle
     let payment = round_details.payment_amount;
@@ -543,7 +559,6 @@ pub fn execute_transfer_admin(
     let new_admin_addr = deps.api.addr_validate(&new_admin)?;
 
     ORACLES.update(deps.storage, &oracle_addr, |status| {
-        // let mut status = status.unwrap_or_default(); TODO
         let mut status = status.unwrap();
         if status.admin != info.sender {
             return Err(ContractError::NotAdmin {});
@@ -575,7 +590,6 @@ pub fn execute_accept_admin(
     let oracle_addr = deps.api.addr_validate(&oracle)?;
 
     ORACLES.update(deps.storage, &oracle_addr, |status| {
-        // let mut status = status.unwrap_or_default(); TODO
         let mut status = status.unwrap();
         if let Some(pending_admin) = status.pending_admin {
             if pending_admin != info.sender.clone() {

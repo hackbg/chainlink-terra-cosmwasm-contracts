@@ -48,6 +48,15 @@ pub fn contract_link_token() -> Box<dyn Contract<Empty>> {
     Box::new(contract)
 }
 
+pub fn contract_df_validator() -> Box<dyn Contract<Empty>> {
+    let contract = ContractWrapper::new(
+        deviation_flagging_validator::contract::execute,
+        deviation_flagging_validator::contract::instantiate,
+        deviation_flagging_validator::contract::query,
+    );
+    Box::new(contract)
+}
+
 fn default_init() -> (App, Addr, Addr, Addr) {
     let mut router = mock_app();
     let owner = Addr::unchecked("owner");
@@ -63,6 +72,20 @@ fn default_init() -> (App, Addr, Addr, Addr) {
         )
         .unwrap();
 
+    let id = router.store_code(contract_df_validator());
+    let validator_addr = router
+        .instantiate_contract(
+            id,
+            owner.clone(),
+            &deviation_flagging_validator::msg::InstantiateMsg {
+                flags: Addr::unchecked("flags"),
+                flagging_threshold: 100000,
+            },
+            &[],
+            "Deviation Flagging Validator",
+        )
+        .unwrap();
+
     let id = router.store_code(contract_flux_aggregator());
     let contract = router
         .instantiate_contract(
@@ -72,7 +95,7 @@ fn default_init() -> (App, Addr, Addr, Addr) {
                 link: link_addr.to_string(),
                 payment_amount: PAYMENT_AMOUNT,
                 timeout: 1800,
-                validator: "validator_addr".into(), // TODO
+                validator: validator_addr.to_string(),
                 min_submission_value: Uint128(1),
                 max_submission_value: Uint128(10000000),
                 decimals: 18,
