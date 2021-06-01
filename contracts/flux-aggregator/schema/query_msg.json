@@ -3,7 +3,7 @@
   "title": "QueryMsg",
   "anyOf": [
     {
-      "description": "Returns contract owner's address Response [`HumanAddr`]",
+      "description": "Returns contract owner's address Response [`Addr`]",
       "type": "object",
       "required": [
         "get_owner"
@@ -12,7 +12,8 @@
         "get_owner": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Returns the settings of the flux aggregator Response: [`ConfigResponse`]",
@@ -24,7 +25,8 @@
         "get_aggregator_config": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Get the amount of payment yet to be withdrawn by oracles. Response: [`Uint128`].",
@@ -36,7 +38,8 @@
         "get_allocated_funds": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Get the amount of future funding available to oracles. Response: [`Uint128`].",
@@ -48,7 +51,8 @@
         "get_available_funds": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Query the available amount of LINK for an oracle to withdraw. Response: [`Uint128`].",
@@ -65,15 +69,12 @@
           "properties": {
             "oracle": {
               "description": "Address of the Oracle which is query for",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Query the number of oracles Response: [`u8`].",
@@ -85,10 +86,11 @@
         "get_oracle_count": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
-      "description": "Query for the addresses of the oracles on the contract Response: [`Vec<HumanAddr>`].",
+      "description": "Query for the addresses of the oracles on the contract Response: [`Vec<Addr>`].",
       "type": "object",
       "required": [
         "get_oracles"
@@ -97,10 +99,11 @@
         "get_oracles": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
-      "description": "Get the admin address of a specific Oracle Response: [`HumanAddr`].",
+      "description": "Get the admin address of a specific Oracle Response: [`Addr`].",
       "type": "object",
       "required": [
         "get_admin"
@@ -114,15 +117,12 @@
           "properties": {
             "oracle": {
               "description": "The address of the oracle whose admin is being queried",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Query data for a specific round Response: [`RoundDataResponse`].",
@@ -145,7 +145,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Query data for the latest round Response: [`RoundDataResponse`].",
@@ -157,7 +158,8 @@
         "get_latest_round_data": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Unimplemented Response: [`OracleRoundStateResponse`].",
@@ -175,11 +177,7 @@
           "properties": {
             "oracle": {
               "description": "Oracle address to look up for",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             },
             "queried_round_id": {
               "description": "Round for which to look up",
@@ -189,12 +187,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
-  ],
-  "definitions": {
-    "HumanAddr": {
-      "type": "string"
-    }
-  }
+  ]
 }
