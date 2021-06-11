@@ -12,11 +12,11 @@ pub fn instantiate(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: InstantiateMsg,
+    _msg: InstantiateMsg,
 ) -> Result<Response, owned::error::ContractError> {
-    config(deps.storage).save(&State {
-        raising_access_controller: msg.rac_address,
-    })?;
+    // config(deps.storage).save(&State {
+    //     raising_access_controller: msg.rac_address,
+    // })?;
     owned_init(deps, env, info, owned::msg::InstantiateMsg {})?;
 
     Ok(Response::default())
@@ -198,9 +198,7 @@ mod tests {
     fn proper_initialization() {
         let mut deps = mock_dependencies(&[]);
 
-        let msg = InstantiateMsg {
-            rac_address: deps.api.addr_validate("rac").unwrap(),
-        };
+        let msg = InstantiateMsg {};
         let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
@@ -212,9 +210,7 @@ mod tests {
     fn raise_flag() {
         let mut deps = mock_dependencies(&[]);
 
-        let msg = InstantiateMsg {
-            rac_address: deps.api.addr_validate("rac").unwrap(),
-        };
+        let msg = InstantiateMsg {};
         let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
@@ -248,9 +244,7 @@ mod tests {
     fn raise_flags() {
         let mut deps = mock_dependencies(&[]);
 
-        let msg = InstantiateMsg {
-            rac_address: deps.api.addr_validate("rac").unwrap(),
-        };
+        let msg = InstantiateMsg {};
         let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
