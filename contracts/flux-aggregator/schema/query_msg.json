@@ -162,28 +162,21 @@
       "additionalProperties": false
     },
     {
-      "description": "Unimplemented Response: [`OracleRoundStateResponse`].",
+      "description": "Get status of specific oracle Response: [`OracleStatus`].",
       "type": "object",
       "required": [
-        "get_oracle_round_state"
+        "get_oracle_status"
       ],
       "properties": {
-        "get_oracle_round_state": {
+        "get_oracle_status": {
           "type": "object",
           "required": [
-            "oracle",
-            "queried_round_id"
+            "oracle"
           ],
           "properties": {
             "oracle": {
               "description": "Oracle address to look up for",
               "type": "string"
-            },
-            "queried_round_id": {
-              "description": "Round for which to look up",
-              "type": "integer",
-              "format": "uint32",
-              "minimum": 0.0
             }
           }
         }
