@@ -428,9 +428,9 @@ pub fn execute_change_oracles(
 ) -> Result<Response, ContractError> {
     validate_ownership(deps.as_ref(), &info)?;
 
-    let mut attributes = vec![attr("action", "oracle_permissions_updated")];
+    let mut attributes = vec![];
 
-    for oracle in removed {
+    for oracle in removed.iter() {
         let oracle = deps.api.addr_validate(&oracle)?;
         remove_oracle(deps.storage, oracle)?;
     }
@@ -456,7 +456,7 @@ pub fn execute_change_oracles(
         ..
     } = CONFIG.load(deps.storage)?;
 
-    let res = execute_update_future_rounds(
+    let _res = execute_update_future_rounds(
         deps,
         env,
         info,
@@ -466,7 +466,14 @@ pub fn execute_change_oracles(
         restart_delay,
         timeout,
     )?;
-    attributes.extend_from_slice(&res.attributes);
+    // TODO uncomment if needed
+    // attributes.extend_from_slice(&res.attributes);
+
+    attributes.extend_from_slice(&[
+        attr("action", "oracle_permissions_updated"),
+        attr("added", format!("{:?}", &added)),
+        attr("removed", format!("{:?}", &removed)),
+    ]);
 
     Ok(Response {
         messages: vec![],
