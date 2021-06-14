@@ -431,7 +431,7 @@ pub fn execute_change_oracles(
     let mut attributes = vec![];
 
     for oracle in removed.iter() {
-        let oracle = deps.api.addr_validate(&oracle)?;
+        let oracle = deps.api.addr_validate(oracle)?;
         remove_oracle(deps.storage, oracle)?;
     }
 
