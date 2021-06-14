@@ -618,7 +618,7 @@ fn transfer_admin() {
         .execute_contract(Addr::unchecked(admin), contract.clone(), &msg, &[])
         .unwrap();
     let expected_attributes = vec![
-        attr("action", "transfer admin"),
+        attr("action", "transfer_admin"),
         attr("oracle", oracle.clone()),
         attr("sender", admin.clone()),
         attr("new_admin", pending.clone()),
