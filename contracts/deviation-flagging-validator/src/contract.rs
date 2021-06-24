@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
+    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
     Uint128, WasmMsg,
 };
 
@@ -183,8 +183,13 @@ fn is_valid(deps: Deps, previous_answer: Uint128, answer: Uint128) -> StdResult<
         Ok(true)
     } else {
         let flagging_threshold = CONFIG.load(deps.storage)?.flagging_threshold;
-        let change = Uint128::from(previous_answer.u128() - answer.u128());
-        let ratio_numerator = change.u128() * THRESHOLD_MULTIPLIER;
+        let change = if previous_answer.u128() > answer.u128() {
+            previous_answer.u128() - answer.u128()
+        } else {
+            answer.u128() - previous_answer.u128()
+        };
+        //Uint128::from(previous_answer.u128() - answer.u128());
+        let ratio_numerator = change * THRESHOLD_MULTIPLIER;
         let ratio = ratio_numerator / previous_answer.u128();
         Ok(ratio <= flagging_threshold as u128)
     }
