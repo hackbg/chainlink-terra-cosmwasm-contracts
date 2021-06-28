@@ -166,13 +166,11 @@ pub enum QueryMsg {
     /// Query data for the latest round
     /// Response: [`RoundDataResponse`].
     GetLatestRoundData {},
-    /// Unimplemented
-    /// Response: [`OracleRoundStateResponse`].
-    GetOracleRoundState {
+    /// Get status of specific oracle
+    /// Response: [`OracleStatus`].
+    GetOracleStatus {
         /// Oracle address to look up for
         oracle: String,
-        /// Round for which to look up
-        queried_round_id: u32,
     },
 }
 

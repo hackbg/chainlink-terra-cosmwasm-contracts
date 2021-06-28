@@ -213,9 +213,10 @@ pub fn execute_submit(
         round.started_at = Some(timestamp);
         ROUNDS.save(deps.storage, round_id.into(), &round)?;
         attributes.extend_from_slice(&[
-            attr("action", "new round"),
-            attr("started by", &info.sender),
-            attr("started at", timestamp),
+            attr("action", "new_round"),
+            attr("round_id", round_id),
+            attr("started_by", &info.sender),
+            attr("started_at", timestamp),
         ]);
 
         oracle.last_started_round = Some(round_id);
@@ -251,7 +252,7 @@ pub fn execute_submit(
         )?;
         LATEST_ROUND_ID.save(deps.storage, &round_id)?;
         attributes.extend_from_slice(&[
-            attr("action", "answer updated"),
+            attr("action", "answer_updated"),
             attr("current", Uint128(new_answer)),
             attr("round_id", round_id),
         ]);
@@ -429,8 +430,8 @@ pub fn execute_change_oracles(
 
     let mut attributes = vec![];
 
-    for oracle in removed {
-        let oracle = deps.api.addr_validate(&oracle)?;
+    for oracle in removed.iter() {
+        let oracle = deps.api.addr_validate(oracle)?;
         remove_oracle(deps.storage, oracle)?;
     }
 
@@ -455,7 +456,7 @@ pub fn execute_change_oracles(
         ..
     } = CONFIG.load(deps.storage)?;
 
-    let res = execute_update_future_rounds(
+    let _res = execute_update_future_rounds(
         deps,
         env,
         info,
@@ -465,7 +466,14 @@ pub fn execute_change_oracles(
         restart_delay,
         timeout,
     )?;
-    attributes.extend_from_slice(&res.attributes);
+    // TODO uncomment if needed
+    // attributes.extend_from_slice(&res.attributes);
+
+    attributes.extend_from_slice(&[
+        attr("action", "oracle_permissions_updated"),
+        attr("added", format!("{:?}", &added)),
+        attr("removed", format!("{:?}", &removed)),
+    ]);
 
     Ok(Response {
         messages: vec![],
@@ -572,7 +580,7 @@ pub fn execute_transfer_admin(
         messages: vec![],
         submessages: vec![],
         attributes: vec![
-            attr("action", "transfer admin"),
+            attr("action", "transfer_admin"),
             attr("oracle", oracle),
             attr("sender", info.sender),
             attr("new_admin", new_admin),
@@ -656,7 +664,12 @@ pub fn execute_request_new_round(
     Ok(Response {
         messages: vec![],
         submessages: vec![],
-        attributes: vec![],
+        attributes: vec![
+            attr("action", "new_round"),
+            attr("round_id", new_round_id),
+            attr("started_by", &info.sender),
+            attr("started_at", timestamp),
+        ],
         data: Some(round_id_serialized),
     })
 }
@@ -1003,15 +1016,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetAdmin { oracle } => to_binary(&get_admin(deps, env, oracle)?),
         QueryMsg::GetRoundData { round_id } => to_binary(&get_round_data(deps, env, round_id)?),
         QueryMsg::GetLatestRoundData {} => to_binary(&get_latest_round_data(deps, env)?),
-        QueryMsg::GetOracleRoundState {
-            oracle,
-            queried_round_id,
-        } => to_binary(&get_oracle_round_state(
-            deps,
-            env,
-            oracle,
-            queried_round_id,
-        )?),
+        QueryMsg::GetOracleStatus { oracle } => to_binary(&get_oracle_status(deps, env, oracle)?),
         QueryMsg::GetOwner {} => to_binary(&get_owner(deps)?),
     }
 }
@@ -1081,14 +1086,9 @@ pub fn get_latest_round_data(deps: Deps, env: Env) -> StdResult<RoundDataRespons
     get_round_data(deps, env, round_id)
 }
 
-pub fn get_oracle_round_state(
-    _deps: Deps,
-    _env: Env,
-    _oracle: String,
-    _queried_round_id: u32,
-) -> StdResult<OracleRoundStateResponse> {
-    // Implementation requires Env
-    todo!()
+pub fn get_oracle_status(deps: Deps, _env: Env, oracle: String) -> StdResult<OracleStatus> {
+    let addr = deps.api.addr_validate(&oracle)?;
+    ORACLES.load(deps.storage, &addr)
 }
 
 fn validate_ownership(deps: Deps, info: &MessageInfo) -> Result<(), ContractError> {
