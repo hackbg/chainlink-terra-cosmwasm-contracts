@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
-    Uint128, WasmMsg,
+    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
+    WasmMsg,
 };
 
 use crate::error::ContractError;
@@ -183,10 +183,13 @@ fn is_valid(deps: Deps, previous_answer: Uint128, answer: Uint128) -> StdResult<
         Ok(true)
     } else {
         let flagging_threshold = CONFIG.load(deps.storage)?.flagging_threshold;
-        let change = previous_answer
-            .checked_sub(answer)
-            .map_err(StdError::overflow)?;
-        let ratio_numerator = change.u128() * THRESHOLD_MULTIPLIER;
+        let change = if previous_answer.u128() > answer.u128() {
+            previous_answer.u128() - answer.u128()
+        } else {
+            answer.u128() - previous_answer.u128()
+        };
+        //Uint128::from(previous_answer.u128() - answer.u128());
+        let ratio_numerator = change * THRESHOLD_MULTIPLIER;
         let ratio = ratio_numerator / previous_answer.u128();
         Ok(ratio <= flagging_threshold as u128)
     }
