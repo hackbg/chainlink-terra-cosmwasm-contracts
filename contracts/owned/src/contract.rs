@@ -56,8 +56,8 @@ pub fn execute_transfer_ownership(
     let attributes = transfer_ownership(deps, env, to)?;
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
+        events: vec![],
         attributes,
         data: None,
     })
@@ -91,8 +91,8 @@ pub fn execute_accept_ownership(
     let logs = accept_ownership(deps, env, info)?;
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
+        events: vec![],
         attributes: logs,
         data: None,
     })
