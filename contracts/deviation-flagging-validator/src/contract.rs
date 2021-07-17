@@ -1,202 +1,211 @@
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
-    StdResult, Storage, Uint128, WasmMsg,
+    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
+    WasmMsg,
 };
 
-use crate::error::*;
-use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{config, config_read, State};
+use crate::error::ContractError;
+use crate::msg::*;
+use crate::state::*;
 
-use flags::msg::HandleMsg as FlagsMsg;
-use owned::contract::{get_owner, handle_accept_ownership, init as owned_init};
+use flags::msg::ExecuteMsg as FlagsMsg;
+use owned::contract::{execute_accept_ownership, get_owner, instantiate as owned_init};
 
 static THRESHOLD_MULTIPLIER: u128 = 100000;
 
-pub fn init<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn instantiate(
+    deps: DepsMut,
     env: Env,
-    msg: InitMsg,
-) -> StdResult<InitResponse> {
-    let flags_addr = deps.api.canonical_address(&msg.flags)?;
-
-    owned_init(deps, env, owned::msg::InitMsg {})?;
-
+    info: MessageInfo,
+    msg: InstantiateMsg,
+) -> Result<Response, ContractError> {
     let state = State {
-        flags: flags_addr,
+        flags: msg.flags,
         flagging_threshold: msg.flagging_threshold,
     };
 
-    config(&mut deps.storage).save(&state)?;
+    CONFIG.save(deps.storage, &state)?;
+    owned_init(deps, env, info, owned::msg::InstantiateMsg {})?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
-pub fn handle<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn execute(
+    deps: DepsMut,
     env: Env,
-    msg: HandleMsg,
-) -> StdResult<HandleResponse> {
+    info: MessageInfo,
+    msg: ExecuteMsg,
+) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::SetFlagsAddress { flags } => handle_set_flags_address(deps, env, flags),
-        HandleMsg::SetFlaggingThreshold { threshold } => {
-            handle_set_flagging_threshold(deps, env, threshold)
+        ExecuteMsg::SetFlagsAddress { flags } => execute_set_flags_address(deps, env, info, flags),
+        ExecuteMsg::SetFlaggingThreshold { threshold } => {
+            execute_set_flagging_threshold(deps, env, info, threshold)
         }
-        HandleMsg::Validate {
+        ExecuteMsg::Validate {
             previous_round_id,
             previous_answer,
             round_id,
             answer,
-        } => handle_validate(
+        } => execute_validate(
             deps,
             env,
+            info,
             previous_round_id,
             previous_answer,
             round_id,
             answer,
         ),
-        HandleMsg::TransferOwnership { to } => handle_transfer_ownership(deps, env, to),
-        HandleMsg::AcceptOwnership {} => handle_accept_ownership(deps, env),
+        ExecuteMsg::TransferOwnership { to } => execute_transfer_ownership(deps, env, info, to),
+        ExecuteMsg::AcceptOwnership {} => execute_owned_accept_ownership(deps, env, info),
     }
 }
 
-pub fn query<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    msg: QueryMsg,
-) -> StdResult<Binary> {
+fn execute_owned_accept_ownership(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+    let res = execute_accept_ownership(deps, env, info)?;
+    Ok(res)
+}
+
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::IsValid {
             previous_answer,
             answer,
-        } => to_binary(&is_valid(&deps, previous_answer, answer)),
-        QueryMsg::GetFlaggingThreshold {} => to_binary(&query_flagging_threshold(&deps)),
-        QueryMsg::GetOwner {} => to_binary(&get_owner(deps)),
+        } => to_binary(&is_valid(deps, previous_answer, answer)?),
+        QueryMsg::GetFlaggingThreshold {} => to_binary(&query_flagging_threshold(deps)?),
+        QueryMsg::GetOwner {} => to_binary(&get_owner(deps)?),
     }
 }
 
-pub fn handle_validate<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn execute_validate(
+    deps: DepsMut,
     env: Env,
+    _info: MessageInfo,
     _previous_round_id: u32,
     previous_answer: Uint128,
     _round_id: u32,
     answer: Uint128,
-) -> StdResult<HandleResponse> {
-    if !(is_valid(deps, previous_answer, answer)?) {
-        let flags = config_read(&deps.storage).load()?.flags;
-        let flags_addr = deps.api.human_address(&flags)?;
+) -> Result<Response, ContractError> {
+    if !(is_valid(deps.as_ref(), previous_answer, answer)?) {
+        let flags = CONFIG.load(deps.storage)?.flags;
         let raise_flag_msg = WasmMsg::Execute {
-            contract_addr: flags_addr,
+            contract_addr: String::from(flags),
             msg: to_binary(&FlagsMsg::RaiseFlag {
                 subject: env.contract.address,
             })?,
             send: vec![],
         };
-        Ok(HandleResponse {
+        Ok(Response {
+            submessages: vec![],
             messages: vec![raise_flag_msg.into()],
-            log: vec![log("action", "validate"), log("is valid", false)],
+            attributes: vec![attr("action", "validate"), attr("is valid", false)],
             data: Some(to_binary(&false)?),
         })
     } else {
-        Ok(HandleResponse {
+        Ok(Response {
+            submessages: vec![],
             messages: vec![],
-            log: vec![log("action", "validate"), log("is valid", true)],
+            attributes: vec![attr("action", "validate"), attr("is valid", true)],
             data: Some(to_binary(&true)?),
         })
     }
 }
 
-pub fn handle_set_flags_address<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn execute_set_flags_address(
+    deps: DepsMut,
     env: Env,
-    flags: HumanAddr,
-) -> StdResult<HandleResponse> {
-    validate_ownership(deps, &env)?;
-    let previous = config_read(&deps.storage).load()?.flags;
-    let new_addr = deps.api.canonical_address(&flags)?;
-    if previous != new_addr {
-        let new_flags = deps.api.canonical_address(&flags)?;
-        config(&mut deps.storage).update(|mut state| {
-            state.flags = new_flags;
+    info: MessageInfo,
+    flags: Addr,
+) -> Result<Response, ContractError> {
+    validate_ownership(deps.as_ref(), &env, info)?;
+    let previous = CONFIG.load(deps.storage)?.flags;
+    if previous != flags {
+        CONFIG.update(deps.storage, |mut state| -> StdResult<_> {
+            state.flags = flags.clone();
             Ok(state)
         })?;
     }
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
-        log: vec![
-            log("action", "flags address updated"),
-            log("previous", deps.api.human_address(&previous)?),
-            log("current", deps.api.human_address(&new_addr)?),
+        attributes: vec![
+            attr("action", "flags address updated"),
+            attr("previous", previous),
+            attr("current", flags),
         ],
         data: None,
     })
 }
 
-pub fn handle_set_flagging_threshold<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn execute_set_flagging_threshold(
+    deps: DepsMut,
     env: Env,
+    info: MessageInfo,
     threshold: u32,
-) -> StdResult<HandleResponse> {
-    validate_ownership(deps, &env)?;
-    let previous_ft = config_read(&deps.storage).load()?.flagging_threshold;
+) -> Result<Response, ContractError> {
+    validate_ownership(deps.as_ref(), &env, info)?;
+    let previous_ft = CONFIG.load(deps.storage)?.flagging_threshold;
 
     if previous_ft != threshold {
-        config(&mut deps.storage).update(|mut state| {
+        CONFIG.update(deps.storage, |mut state| -> StdResult<_> {
             state.flagging_threshold = threshold;
             Ok(state)
         })?;
     }
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
-        log: vec![
-            log("action", "flagging threshold updated"),
-            log("previous", previous_ft),
-            log("current", threshold),
+        attributes: vec![
+            attr("action", "flagging threshold updated"),
+            attr("previous", previous_ft),
+            attr("current", threshold),
         ],
         data: None,
     })
 }
 
-pub fn handle_transfer_ownership<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn execute_transfer_ownership(
+    deps: DepsMut,
     env: Env,
-    to: HumanAddr,
-) -> StdResult<HandleResponse> {
-    let to = deps.api.canonical_address(&to)?;
-    owned::contract::handle_transfer_ownership(deps, env, to)
+    info: MessageInfo,
+    to: Addr,
+) -> Result<Response, ContractError> {
+    let owned_res = owned::contract::execute_transfer_ownership(deps, env, info, to)?;
+    Ok(owned_res)
 }
 
-fn is_valid<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    previous_answer: Uint128,
-    answer: Uint128,
-) -> StdResult<bool> {
+fn is_valid(deps: Deps, previous_answer: Uint128, answer: Uint128) -> StdResult<bool> {
     if previous_answer == Uint128::zero() {
         Ok(true)
     } else {
-        let flagging_threshold = config_read(&deps.storage).load()?.flagging_threshold;
-        let change = (previous_answer - answer)?;
-        let ratio_numerator = change.u128() * THRESHOLD_MULTIPLIER;
+        let flagging_threshold = CONFIG.load(deps.storage)?.flagging_threshold;
+        let change = if previous_answer.u128() > answer.u128() {
+            previous_answer.u128() - answer.u128()
+        } else {
+            answer.u128() - previous_answer.u128()
+        };
+        //Uint128::from(previous_answer.u128() - answer.u128());
+        let ratio_numerator = change * THRESHOLD_MULTIPLIER;
         let ratio = ratio_numerator / previous_answer.u128();
         Ok(ratio <= flagging_threshold as u128)
     }
 }
 
-pub fn query_flagging_threshold<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-) -> StdResult<u32> {
-    let flagging_threshold = config_read(&deps.storage).load()?.flagging_threshold;
-    Ok(flagging_threshold)
+pub fn query_flagging_threshold(deps: Deps) -> StdResult<FlaggingThresholdResponse> {
+    let flagging_threshold = CONFIG.load(deps.storage)?.flagging_threshold;
+    Ok(FlaggingThresholdResponse {
+        threshold: flagging_threshold,
+    })
 }
 
-fn validate_ownership<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    env: &Env,
-) -> StdResult<()> {
+fn validate_ownership(deps: Deps, _env: &Env, info: MessageInfo) -> Result<(), ContractError> {
     let owner = get_owner(deps)?;
-    if env.message.sender != owner {
-        return ContractErr::NotOwner.std_err();
+    if info.sender != owner {
+        return Err(ContractError::NotOwner {});
     }
     Ok(())
 }
@@ -204,130 +213,114 @@ fn validate_ownership<S: Storage, A: Api, Q: Querier>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, from_binary};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{coins, Api};
 
     #[test]
     fn proper_initialization() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
-        let msg = InitMsg {
-            flags: HumanAddr::from("flags"),
+        let msg = InstantiateMsg {
+            flags: deps.api.addr_validate("flags").unwrap(),
             flagging_threshold: 100000,
         };
-        let env = mock_env("creator", &coins(1000, "earth"));
+        let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
-        let res = init(&mut deps, env, msg).unwrap();
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
     }
 
     #[test]
     fn setting_flags_address() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
-        let msg = InitMsg {
-            flags: HumanAddr::from("flags"),
+        let msg = InstantiateMsg {
+            flags: deps.api.addr_validate("flags").unwrap(),
             flagging_threshold: 100000,
         };
-        let env = mock_env("creator", &coins(1000, "earth"));
+        let info = mock_info("creator", &coins(1000, "earth"));
 
-        let res = init(&mut deps, env.clone(), msg).unwrap();
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let msg = HandleMsg::SetFlagsAddress {
-            flags: HumanAddr::from("new_flags"),
-        };
-        let res = handle(&mut deps, env.clone(), msg.clone()).unwrap();
-        assert_eq!(0, res.messages.len());
+        let new_flags = deps.api.addr_validate("new_flags").unwrap();
+        let res = execute_set_flags_address(deps.as_mut(), mock_env(), info, new_flags.clone());
+        assert_eq!(0, res.unwrap().messages.len());
 
-        let flag_addr = deps
-            .api
-            .human_address(&config_read(&deps.storage).load().unwrap().flags)
-            .unwrap();
-        assert_eq!(HumanAddr::from("new_flags"), flag_addr);
+        let flag_addr = CONFIG.load(&deps.storage).unwrap().flags;
+        assert_eq!(new_flags, flag_addr);
     }
 
     #[test]
     fn setting_threshold() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
-        let msg = InitMsg {
-            flags: HumanAddr::from("flags"),
+        let msg = InstantiateMsg {
+            flags: deps.api.addr_validate("flags").unwrap(),
             flagging_threshold: 100000,
         };
-        let env = mock_env("creator", &coins(1000, "earth"));
+        let info = mock_info("creator", &coins(1000, "earth"));
 
-        let res = init(&mut deps, env.clone(), msg).unwrap();
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let msg = HandleMsg::SetFlaggingThreshold { threshold: 1000 };
-        let res = handle(&mut deps, env.clone(), msg.clone()).unwrap();
-        assert_eq!(0, res.messages.len());
+        let _threshold =
+            execute_set_flagging_threshold(deps.as_mut(), mock_env(), info, 1000).unwrap();
 
-        let threshold = &config_read(&deps.storage)
-            .load()
-            .unwrap()
-            .flagging_threshold;
-        assert_eq!(1000, *threshold);
+        let threshold = CONFIG.load(&deps.storage).unwrap().flagging_threshold;
+        assert_eq!(1000, threshold);
     }
 
     #[test]
     fn is_valid_gives_right_response() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
-        let msg = InitMsg {
-            flags: HumanAddr::from("flags"),
+        let msg = InstantiateMsg {
+            flags: deps.api.addr_validate("flags").unwrap(),
             flagging_threshold: 80000,
         };
+        let info = mock_info("creator", &coins(1000, "earth"));
 
-        let env = mock_env("creator", &coins(1000, "earth"));
-        let res = init(&mut deps, env, msg).unwrap();
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        // this input should return false
-        let msg = QueryMsg::IsValid {
-            previous_answer: Uint128::from(100 as u64),
-            answer: Uint128::from(5 as u64),
-        };
-        let res = query(&deps, msg).unwrap();
-        let is_valid: StdResult<bool> = from_binary(&res).unwrap();
-        assert_eq!(false, is_valid.unwrap());
+        let previous_answer = Uint128::from(100 as u64);
+        let answer = Uint128::from(5 as u64);
+        let check_valid = is_valid(deps.as_ref(), previous_answer, answer).unwrap();
+        assert_eq!(false, check_valid);
 
         // this input should return true
-        let msg = QueryMsg::IsValid {
-            previous_answer: Uint128::from(3 as u64),
-            answer: Uint128::from(1 as u64),
-        };
-        let res = query(&deps, msg).unwrap();
-        let is_valid: StdResult<bool> = from_binary(&res).unwrap();
-        assert_eq!(true, is_valid.unwrap());
+        let previous_answer = Uint128::from(3 as u64);
+        let answer = Uint128::from(1 as u64);
+        let check_valid = is_valid(deps.as_ref(), previous_answer, answer).unwrap();
+        assert_eq!(true, check_valid);
 
         // should return true if previous_answer is 0
-        let msg = QueryMsg::IsValid {
-            previous_answer: Uint128::zero(),
-            answer: Uint128::from(5 as u64),
-        };
-        let res = query(&deps, msg).unwrap();
-        let is_valid: StdResult<bool> = from_binary(&res).unwrap();
-        assert_eq!(true, is_valid.unwrap());
+        let previous_answer = Uint128::zero();
+        let answer = Uint128::from(5 as u64);
+        let check_valid = is_valid(deps.as_ref(), previous_answer, answer).unwrap();
+        assert_eq!(true, check_valid);
     }
 
     #[test]
     fn validate() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
-        let msg = InitMsg {
-            flags: HumanAddr::from("flags"),
+        let msg = InstantiateMsg {
+            flags: deps.api.addr_validate("flags").unwrap(),
             flagging_threshold: 80000,
         };
+        let info = mock_info("creator", &coins(1000, "earth"));
 
-        let env = mock_env("creator", &coins(1000, "earth"));
-
-        let res = init(&mut deps, env.clone(), msg).unwrap();
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let msg = HandleMsg::Validate {
+        let msg = ExecuteMsg::Validate {
             previous_round_id: 2,
             previous_answer: Uint128::from(3 as u64),
             answer: Uint128::from(1 as u64),
@@ -335,42 +328,40 @@ mod tests {
         };
 
         // the case if validate is true
-        let res = handle(&mut deps, env.clone(), msg).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
         assert_eq!(
-            vec![log("action", "validate"), log("is valid", true)],
-            res.log
+            vec![attr("action", "validate"), attr("is valid", true)],
+            res.attributes
         );
 
-        let msg = HandleMsg::Validate {
+        let msg = ExecuteMsg::Validate {
             previous_round_id: 2,
             previous_answer: Uint128::from(100 as u64),
             answer: Uint128::from(5 as u64),
             round_id: 3,
         };
-        let res = handle(&mut deps, env.clone(), msg).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(
-            vec![log("action", "validate"), log("is valid", false)],
-            res.log
+            vec![attr("action", "validate"), attr("is valid", false)],
+            res.attributes
         );
     }
 
     #[test]
-    fn query_flagging_threshold() {
-        let mut deps = mock_dependencies(20, &[]);
+    fn test_query_flagging_threshold() {
+        let mut deps = mock_dependencies(&[]);
 
-        let msg = InitMsg {
-            flags: HumanAddr::from("flags"),
+        let msg = InstantiateMsg {
+            flags: deps.api.addr_validate("flags").unwrap(),
             flagging_threshold: 80000,
         };
+        let info = mock_info("creator", &coins(1000, "earth"));
 
-        let env = mock_env("creator", &coins(1000, "earth"));
-
-        let res = init(&mut deps, env.clone(), msg).unwrap();
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let msg = QueryMsg::GetFlaggingThreshold {};
-        let res = query(&deps, msg).unwrap();
-        let flagging_threshold: StdResult<u32> = from_binary(&res).unwrap();
-        assert_eq!(80000 as u32, flagging_threshold.unwrap());
+        let flagging_threshold: u32 = query_flagging_threshold(deps.as_ref()).unwrap().threshold;
+        assert_eq!(80000 as u32, flagging_threshold);
     }
 }

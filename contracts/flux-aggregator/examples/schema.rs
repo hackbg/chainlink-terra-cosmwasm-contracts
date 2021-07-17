@@ -12,13 +12,13 @@ fn main() {
     create_dir_all(&out_dir).unwrap();
     remove_schemas(&out_dir).unwrap();
 
-    export_schema(&schema_for!(InitMsg), &out_dir);
-    export_schema(&schema_for!(HandleMsg), &out_dir);
+    export_schema(&schema_for!(InstantiateMsg), &out_dir);
+    export_schema(&schema_for!(ExecuteMsg), &out_dir);
     export_schema(&schema_for!(QueryMsg), &out_dir);
     export_schema(&schema_for!(ConfigResponse), &out_dir);
     export_schema(&schema_for!(RoundDataResponse), &out_dir);
     export_schema(&schema_for!(OracleRoundStateResponse), &out_dir);
-    export_schema(&schema_for!(State), &out_dir);
+    export_schema(&schema_for!(Config), &out_dir);
     export_schema(&schema_for!(OracleStatus), &out_dir);
     export_schema(&schema_for!(Round), &out_dir);
     export_schema(&schema_for!(RoundDetails), &out_dir);

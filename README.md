@@ -80,7 +80,7 @@ to run it is this:
 docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/workspace-optimizer:0.10.3
+  cosmwasm/workspace-optimizer:0.11.2
 ```
 Or using the script that does the same:
 ```sh
@@ -132,4 +132,4 @@ We use the [gitflow](https://danielkummer.github.io/git-flow-cheatsheet/) workfl
 ### Rules
 - Use `rebase` instead of `merge` to update your codebase, except when a PR gets included in a branch.
 - Use meaningful descriptions and titles in commit messages.
-- Explain what you did in your PRs, add images whenever possible for showing the status before/after the change visually. 
+- Explain what you did in your PRs, add images whenever possible for showing the status before/after the change visually.

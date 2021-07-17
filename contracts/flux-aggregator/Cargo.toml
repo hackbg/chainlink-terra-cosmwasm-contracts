@@ -10,24 +10,22 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["singlepass"]
-# for quicker tests, cargo test --lib
 # for more explicit tests, cargo test --features=backtraces
-backtraces = ["cosmwasm-std/backtraces", "cosmwasm-vm/backtraces"]
-singlepass = ["cosmwasm-vm/default-singlepass"]
+backtraces = ["cosmwasm-std/backtraces"]
 
 [dependencies]
-cosmwasm-std = { version = "0.10.1" }
-cosmwasm-storage = { version = "0.10.1" }
-schemars = "0.7"
+cosmwasm-std = { version = "0.14.0" }
+cosmwasm-storage = { version = "0.14.0" }
+cw-storage-plus = { version = "0.6.0", features = ["iterator"] }
+schemars = "0.8.3"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
-snafu = { version = "0.6.3" }
 thiserror = { version = "1.0.24" }
-cw20 = { version = "0.2.3" }
+cw20 = { version = "0.6.0" }
 link-token = { path = "../link-token", default-features = false }
 owned = { path = "../owned", default-features = false, features = ["library"] }
+deviation-flagging-validator = { path = "../deviation-flagging-validator", default-features = false }
 utils = { path = "../utils" }
 
 [dev-dependencies]
-cosmwasm-schema = { version = "0.10.1" }
-cosmwasm-vm = { version = "0.10.1", default-features = false }
+cosmwasm-schema = { version = "0.14.0" }
+cw-multi-test = { version = "0.6.0" }
