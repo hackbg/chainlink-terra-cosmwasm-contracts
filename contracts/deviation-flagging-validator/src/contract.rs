@@ -82,8 +82,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 pub fn execute_validate(
     deps: DepsMut,
-    env: Env,
-    _info: MessageInfo,
+    _env: Env,
+    info: MessageInfo,
     _previous_round_id: u32,
     previous_answer: Uint128,
     _round_id: u32,
@@ -94,7 +94,7 @@ pub fn execute_validate(
         let raise_flag_msg = WasmMsg::Execute {
             contract_addr: String::from(flags),
             msg: to_binary(&FlagsMsg::RaiseFlag {
-                subject: env.contract.address,
+                subject: info.sender,
             })?,
             funds: vec![],
         };
