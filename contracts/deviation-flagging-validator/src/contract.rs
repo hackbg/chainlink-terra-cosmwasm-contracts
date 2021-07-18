@@ -95,18 +95,18 @@ pub fn execute_validate(
             msg: to_binary(&FlagsMsg::RaiseFlag {
                 subject: env.contract.address,
             })?,
-            send: vec![],
+            funds: vec![],
         };
         Ok(Response {
-            submessages: vec![],
             messages: vec![raise_flag_msg.into()],
+            events: vec![],
             attributes: vec![attr("action", "validate"), attr("is valid", false)],
             data: Some(to_binary(&false)?),
         })
     } else {
         Ok(Response {
-            submessages: vec![],
             messages: vec![],
+            events: vec![],
             attributes: vec![attr("action", "validate"), attr("is valid", true)],
             data: Some(to_binary(&true)?),
         })
@@ -129,8 +129,8 @@ pub fn execute_set_flags_address(
     }
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
+        events: vec![],
         attributes: vec![
             attr("action", "flags address updated"),
             attr("previous", previous),
@@ -157,8 +157,8 @@ pub fn execute_set_flagging_threshold(
     }
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
+        events: vec![],
         attributes: vec![
             attr("action", "flagging threshold updated"),
             attr("previous", previous_ft),
@@ -213,8 +213,8 @@ fn validate_ownership(deps: Deps, _env: &Env, info: MessageInfo) -> Result<(), C
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cosmwasm_std::coins;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Api};
 
     #[test]
     fn proper_initialization() {

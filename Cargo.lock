@@ -549,10 +549,10 @@ dependencies = [
 name = "deviation-flagging-validator"
 version = "0.1.0"
 dependencies = [
- "cosmwasm-schema 0.14.1",
- "cosmwasm-std 0.14.1",
- "cosmwasm-storage 0.14.1",
- "cw-storage-plus 0.6.2",
+ "cosmwasm-schema 0.15.0",
+ "cosmwasm-std 0.15.0",
+ "cosmwasm-storage 0.15.0",
+ "cw-storage-plus 0.7.0",
  "flags",
  "owned",
  "schemars 0.8.3",
