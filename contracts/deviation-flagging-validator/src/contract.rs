@@ -1,3 +1,4 @@
+use cosmwasm_std::SubMsg;
 use cosmwasm_std::{
     attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
     WasmMsg,
@@ -98,7 +99,7 @@ pub fn execute_validate(
             funds: vec![],
         };
         Ok(Response {
-            messages: vec![raise_flag_msg.into()],
+            messages: vec![SubMsg::new(raise_flag_msg)],
             events: vec![],
             attributes: vec![attr("action", "validate"), attr("is valid", false)],
             data: Some(to_binary(&false)?),
@@ -213,8 +214,8 @@ fn validate_ownership(deps: Deps, _env: &Env, info: MessageInfo) -> Result<(), C
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::coins;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{coins, Api};
 
     #[test]
     fn proper_initialization() {

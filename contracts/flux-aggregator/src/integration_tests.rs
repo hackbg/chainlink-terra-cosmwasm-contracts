@@ -3,7 +3,7 @@
 use cosmwasm_std::{
     attr, from_binary,
     testing::{mock_env, MockApi, MockStorage},
-    Addr, Empty, Uint128,
+    Addr, Attribute, Empty, Uint128,
 };
 use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
 
@@ -22,9 +22,9 @@ macro_rules! personas {
 static MIN_ANS: u32 = 1;
 static MAX_ANS: u32 = 1;
 static RESTART_DELAY: u32 = 0;
-static PAYMENT_AMOUNT: Uint128 = Uint128(3);
-static DEPOSIT: Uint128 = Uint128(100);
-static ANSWER: Uint128 = Uint128(100);
+static PAYMENT_AMOUNT: Uint128 = Uint128::new(3);
+static DEPOSIT: Uint128 = Uint128::new(100);
+static ANSWER: Uint128 = Uint128::new(100);
 
 fn mock_app() -> App {
     let env = mock_env();
@@ -96,8 +96,8 @@ fn default_init() -> (App, Addr, Addr, Addr) {
                 payment_amount: PAYMENT_AMOUNT,
                 timeout: 1800,
                 validator: validator_addr.to_string(),
-                min_submission_value: Uint128(1),
-                max_submission_value: Uint128(10000000),
+                min_submission_value: Uint128::new(1),
+                max_submission_value: Uint128::new(10000000),
                 decimals: 18,
                 description: "LINK/USD".to_string(),
             },
@@ -318,7 +318,7 @@ fn submit_complete_round() {
             contract.clone(),
             &ExecuteMsg::Submit {
                 round_id: 1,
-                submission: Uint128(100),
+                submission: Uint128::new(100),
             },
             &[],
         )
@@ -329,7 +329,7 @@ fn submit_complete_round() {
             contract.clone(),
             &ExecuteMsg::Submit {
                 round_id: 1,
-                submission: Uint128(200),
+                submission: Uint128::new(200),
             },
             &[],
         )
@@ -340,7 +340,7 @@ fn submit_complete_round() {
         .query_wasm_smart(contract.clone(), &QueryMsg::GetLatestRoundData {})
         .unwrap();
     assert!(round.updated_at.is_some());
-    assert_eq!(round.answer, Some(Uint128(150))); // (100 + 200) / 2
+    assert_eq!(round.answer, Some(Uint128::new(150))); // (100 + 200) / 2
 }
 
 #[test]
@@ -379,7 +379,7 @@ fn submit_twice() {
 // fn withdraw_funds_success() {
 //     let (mut router, owner, _link_addr, contract) = default_init();
 
-//     let amount = Uint128(85);
+//     let amount = Uint128::new(85);
 //     let recipient = "recipient";
 //     let withdraw = ExecuteMsg::WithdrawFunds {
 //         recipient: recipient.into(),
@@ -409,7 +409,7 @@ fn submit_twice() {
 //         .wrap()
 //         .query_wasm_smart(contract, &QueryMsg::GetAvailableFunds {})
 //         .unwrap();
-//     assert_eq!(available, Uint128(15));
+//     assert_eq!(available, Uint128::new(15));
 //     // }
 // }
 
@@ -570,18 +570,20 @@ fn set_validator() {
     let res = router
         .execute_contract(owner.clone(), contract.clone(), &msg, &[])
         .unwrap();
-    // successful change should return attributes
-    assert!(res.attributes.len() == 3);
+    // successful change should return more than 1 attribute (first is reserved for contract_address)
+    let attributes = res.events.last().unwrap().attributes.clone();
+    assert_eq!(attributes.len(), 4);
     let config: ConfigResponse = router
         .wrap()
         .query_wasm_smart(contract.clone(), &QueryMsg::GetAggregatorConfig {})
         .unwrap();
     assert_eq!(config.validator, new_validator);
-    // setting the same validator twice should have attributes
+    // setting the same validator twice should not have attributes
     let res = router
         .execute_contract(owner.clone(), contract.clone(), &msg, &[])
         .unwrap();
-    assert!(res.attributes.is_empty());
+    let attributes = res.events.last().unwrap().attributes.clone();
+    assert_eq!(attributes.len(), 1);
     // should only be usable by owner
     let res = router.execute_contract(Addr::unchecked("Ned"), contract.clone(), &msg, &[]);
     assert_eq!(res.unwrap_err(), ContractError::NotOwner {}.to_string());
@@ -623,7 +625,11 @@ fn transfer_admin() {
         attr("sender", admin.clone()),
         attr("new_admin", pending.clone()),
     ];
-    assert_eq!(res.attributes, expected_attributes);
+    let attributes = res.events.last().unwrap().attributes.clone();
+    assert_eq!(
+        attributes.into_iter().skip(1).collect::<Vec<Attribute>>(),
+        expected_attributes
+    );
 
     let res: Addr = router
         .wrap()

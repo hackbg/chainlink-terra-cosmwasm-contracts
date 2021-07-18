@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, OverflowError,
-    OverflowOperation, Response, StdError, StdResult, Storage, Timestamp, Uint128, WasmMsg,
+    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, OverflowError,
+    OverflowOperation, Response, StdError, StdResult, Storage, SubMsg, Timestamp, Uint128, WasmMsg,
 };
 use cw20::{BalanceResponse, Cw20ReceiveMsg};
 use deviation_flagging_validator::msg::ExecuteMsg as ValidatorMsg;
@@ -260,19 +260,18 @@ pub fn execute_submit(
         let previous_round_id = prev_round_id(round_id)?;
         let prev_round = ROUNDS.load(deps.storage, previous_round_id.into())?;
         // Send value to validator
-        messages.push(
-            WasmMsg::Execute {
-                contract_addr: validator.to_string(),
-                msg: to_binary(&ValidatorMsg::Validate {
-                    previous_round_id,
-                    previous_answer: prev_round.answer.unwrap_or_default(),
-                    round_id,
-                    answer: Uint128::new(new_answer),
-                })?,
-                funds: vec![],
-            }
-            .into(),
-        );
+        let validator_msg = WasmMsg::Execute {
+            contract_addr: validator.to_string(),
+            msg: to_binary(&ValidatorMsg::Validate {
+                previous_round_id,
+                previous_answer: prev_round.answer.unwrap_or_default(),
+                round_id,
+                answer: Uint128::new(new_answer),
+            })?,
+            funds: vec![],
+        };
+
+        messages.push(SubMsg::new(validator_msg));
     }
     // pay oracle
     let payment = round_details.payment_amount;
@@ -717,7 +716,7 @@ pub fn execute_withdraw_payment(
     };
 
     Ok(Response {
-        messages: vec![transfer_msg.into()],
+        messages: vec![SubMsg::new(transfer_msg)],
         events: vec![],
         attributes: vec![],
         data: None,
@@ -759,7 +758,10 @@ pub fn execute_withdraw_funds(
     };
 
     Ok(Response {
-        messages: vec![transfer_msg.into(), update_funds_msg.into()],
+        messages: vec![transfer_msg, update_funds_msg]
+            .into_iter()
+            .map(SubMsg::new)
+            .collect(),
         events: vec![],
         // TODO: assess if submessages would be an improvement here
         // submessages: vec![
@@ -974,7 +976,7 @@ pub fn execute_receive(
     };
 
     Ok(Response {
-        messages: vec![msg.into()],
+        messages: vec![SubMsg::new(msg)],
         events: vec![],
         attributes: vec![],
         data: None,

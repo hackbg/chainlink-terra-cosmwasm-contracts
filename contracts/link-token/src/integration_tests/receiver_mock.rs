@@ -35,7 +35,7 @@ pub fn contract_receiver_mock() -> Box<dyn Contract<Empty>> {
                 }) => {
                     let received: PingMsg = from_binary(&msg)?;
                     Ok(Response {
-                        submessages: vec![],
+                        events: vec![],
                         messages: vec![],
                         attributes: vec![attr("action", "pong")],
                         data: Some(to_binary(&received.payload)?),
