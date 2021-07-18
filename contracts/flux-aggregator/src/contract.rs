@@ -763,21 +763,6 @@ pub fn execute_withdraw_funds(
             .map(SubMsg::new)
             .collect(),
         events: vec![],
-        // TODO: assess if submessages would be an improvement here
-        // submessages: vec![
-        //     SubMsg {
-        //         id: 0,
-        //         msg: transfer_msg.into(),
-        //         gas_limit: None,
-        //         reply_on: ReplyOn::Always,
-        //     },
-        //     SubMsg {
-        //         id: 1,
-        //         msg: update_funds_msg.into(),
-        //         gas_limit: None,
-        //         reply_on: ReplyOn::Always,
-        //     },
-        // ],
         attributes: vec![],
         data: None,
     })
