@@ -734,7 +734,7 @@ pub fn execute_withdraw_funds(
 
     let funds = RECORDED_FUNDS.load(deps.storage)?;
     let payment_amount = CONFIG.load(deps.storage)?.payment_amount;
-    let oracle_count = get_oracle_count(deps.as_ref(), env.clone())?;
+    let oracle_count = get_oracle_count(deps.as_ref(), env)?;
     let available = funds
         .available
         .checked_sub(required_reserve(payment_amount, oracle_count))
@@ -746,24 +746,24 @@ pub fn execute_withdraw_funds(
 
     let link = CONFIG.load(deps.storage)?.link;
 
+    let attributes = match update_available_funds(deps, available - amount)? {
+        Some(funds) => vec![
+            attr("action", "update_available_funds"),
+            attr("amount", funds),
+        ],
+        None => vec![],
+    };
+
     let transfer_msg = WasmMsg::Execute {
         contract_addr: link.to_string(),
         msg: to_binary(&LinkMsg::Transfer { recipient, amount })?,
         funds: vec![],
     };
-    let update_funds_msg = WasmMsg::Execute {
-        contract_addr: env.contract.address.to_string(),
-        msg: to_binary(&ExecuteMsg::UpdateAvailableFunds {})?,
-        funds: vec![],
-    };
 
     Ok(Response {
-        messages: vec![transfer_msg, update_funds_msg]
-            .into_iter()
-            .map(SubMsg::new)
-            .collect(),
+        messages: vec![SubMsg::new(transfer_msg)],
         events: vec![],
-        attributes: vec![],
+        attributes,
         data: None,
     })
 }
@@ -781,14 +781,31 @@ pub fn execute_update_available_funds(
         },
     )?;
 
+    match update_available_funds(deps, prev_available.balance)? {
+        Some(now_available) => Ok(Response {
+            messages: vec![],
+            events: vec![],
+            attributes: vec![
+                attr("action", "update_available_funds"),
+                attr("amount", now_available),
+            ],
+            data: None,
+        }),
+        None => Ok(Response::default()),
+    }
+}
+
+fn update_available_funds(
+    deps: DepsMut,
+    prev_available: Uint128,
+) -> Result<Option<Uint128>, ContractError> {
     let funds = RECORDED_FUNDS.load(deps.storage)?;
     let now_available = prev_available
-        .balance
         .checked_sub(funds.allocated)
         .map_err(StdError::from)?;
 
     if funds.available == now_available {
-        return Ok(Response::default());
+        return Ok(None);
     }
     RECORDED_FUNDS.save(
         deps.storage,
@@ -798,15 +815,7 @@ pub fn execute_update_available_funds(
         },
     )?;
 
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes: vec![
-            attr("action", "update_available_funds"),
-            attr("amount", now_available),
-        ],
-        data: None,
-    })
+    Ok(Some(now_available))
 }
 
 pub fn execute_set_requester_permissions(

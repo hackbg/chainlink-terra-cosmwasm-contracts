@@ -5,6 +5,7 @@ use cosmwasm_std::{
     testing::{mock_env, MockApi, MockStorage},
     Addr, Attribute, Empty, Uint128,
 };
+use cw20::BalanceResponse;
 use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
 
 use crate::{
@@ -374,44 +375,72 @@ fn submit_twice() {
     );
 }
 
-// TODO: test requires update in cw-multi-test
-// #[test]
-// fn withdraw_funds_success() {
-//     let (mut router, owner, _link_addr, contract) = default_init();
+#[test]
+fn withdraw_funds_success() {
+    use link_token::msg::QueryMsg::*;
 
-//     let amount = Uint128::new(85);
-//     let recipient = "recipient";
-//     let withdraw = ExecuteMsg::WithdrawFunds {
-//         recipient: recipient.into(),
-//         amount,
-//     };
-//     router
-//         .execute_contract(owner, contract.clone(), &withdraw, &[])
-//         .unwrap();
+    let (mut router, owner, link_addr, contract) = default_init();
 
-//     // let res: HandleResponse = handle(&mut deps, env.clone(), withdraw).unwrap();
-//     // assert!(res.messages.len() == 2);
-//     // let cosmos_msg = res.messages.get(1).unwrap();
-//     // if let CosmosMsg::Wasm(WasmMsg::Execute {
-//     //     contract_addr: _,
-//     //     msg,
-//     //     send: _,
-//     // }) = cosmos_msg
-//     // {
-//     //     let msg = from_binary::<ExecuteMsg>(msg).unwrap();
-//     //     assert!(msg == ExecuteMsg::UpdateAvailableFunds {});
+    let initial_balance: BalanceResponse = router
+        .wrap()
+        .query_wasm_smart(
+            link_addr.clone(),
+            &Balance {
+                address: contract.to_string(),
+            },
+        )
+        .unwrap();
+    assert!(initial_balance.balance == Uint128::new(100));
 
-//     //     deps.with_querier(|querier| Ok(querier.decrease_balance(amount.u128())))
-//     //         .unwrap();
-//     //     let _: HandleResponse = handle(&mut deps, env, msg).unwrap();
+    let amount = Uint128::new(85);
+    let expected_remaining = Uint128::new(15);
 
-//     let available: Uint128 = router
-//         .wrap()
-//         .query_wasm_smart(contract, &QueryMsg::GetAvailableFunds {})
-//         .unwrap();
-//     assert_eq!(available, Uint128::new(15));
-//     // }
-// }
+    let recipient = "recipient";
+    let withdraw = ExecuteMsg::WithdrawFunds {
+        recipient: recipient.into(),
+        amount,
+    };
+    router
+        .execute_contract(owner, contract.clone(), &withdraw, &[])
+        .unwrap();
+
+    let available: Uint128 = router
+        .wrap()
+        .query_wasm_smart(contract.clone(), &QueryMsg::GetAvailableFunds {})
+        .unwrap();
+    assert!(available == expected_remaining);
+
+    let new_balance: BalanceResponse = router
+        .wrap()
+        .query_wasm_smart(
+            link_addr,
+            &Balance {
+                address: contract.to_string(),
+            },
+        )
+        .unwrap();
+
+    assert!(new_balance.balance == expected_remaining)
+}
+
+#[test]
+fn withdraw_funds_insufficient() {
+    let (mut router, owner, _link_addr, contract) = default_init();
+
+    let amount = Uint128::new(850);
+
+    let recipient = "recipient";
+    let withdraw = ExecuteMsg::WithdrawFunds {
+        recipient: recipient.into(),
+        amount,
+    };
+
+    let res = router.execute_contract(owner, contract.clone(), &withdraw, &[]);
+    assert_eq!(
+        res.unwrap_err(),
+        ContractError::InsufficientReserveFunds {}.to_string()
+    );
+}
 
 #[test]
 fn add_oracles() {
