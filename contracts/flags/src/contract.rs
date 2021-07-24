@@ -57,8 +57,8 @@ pub fn execute_raise_flag(
     check_access(deps.as_ref())?;
     if FLAGS.may_load(deps.as_ref().storage, &subject)? == Some(true) {
         Ok(Response {
-            submessages: vec![],
             messages: vec![],
+            events: vec![],
             attributes: vec![
                 attr("action", "already raised flag"),
                 attr("subject", subject),
@@ -68,8 +68,8 @@ pub fn execute_raise_flag(
     } else {
         FLAGS.save(deps.storage, &subject, &true)?;
         Ok(Response {
-            submessages: vec![],
             messages: vec![],
+            events: vec![],
             attributes: vec![attr("action", "raised flag"), attr("subject", subject)],
             data: None,
         })
@@ -97,8 +97,8 @@ pub fn execute_raise_flags(
         }
     }
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
+        events: vec![],
         attributes,
         data: None,
     })
@@ -120,8 +120,8 @@ pub fn execute_lower_flags(
         }
     }
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
+        events: vec![],
         attributes,
         data: None,
     })
@@ -139,8 +139,8 @@ pub fn execute_set_raising_access_controller(
         raising_access_controller: rac_address.clone(),
     })?;
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
+        events: vec![],
         attributes: vec![
             attr("action", "raising access controller updated"),
             attr("address", rac_address),
@@ -191,8 +191,8 @@ fn check_access(_deps: Deps) -> Result<(), ContractError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cosmwasm_std::coins;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Api};
 
     #[test]
     fn proper_initialization() {

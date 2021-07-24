@@ -1,3 +1,4 @@
+use cosmwasm_std::SubMsg;
 use cosmwasm_std::{
     attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
     WasmMsg,
@@ -81,8 +82,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 pub fn execute_validate(
     deps: DepsMut,
-    env: Env,
-    _info: MessageInfo,
+    _env: Env,
+    info: MessageInfo,
     _previous_round_id: u32,
     previous_answer: Uint128,
     _round_id: u32,
@@ -93,20 +94,20 @@ pub fn execute_validate(
         let raise_flag_msg = WasmMsg::Execute {
             contract_addr: String::from(flags),
             msg: to_binary(&FlagsMsg::RaiseFlag {
-                subject: env.contract.address,
+                subject: info.sender,
             })?,
-            send: vec![],
+            funds: vec![],
         };
         Ok(Response {
-            submessages: vec![],
-            messages: vec![raise_flag_msg.into()],
+            messages: vec![SubMsg::new(raise_flag_msg)],
+            events: vec![],
             attributes: vec![attr("action", "validate"), attr("is valid", false)],
             data: Some(to_binary(&false)?),
         })
     } else {
         Ok(Response {
-            submessages: vec![],
             messages: vec![],
+            events: vec![],
             attributes: vec![attr("action", "validate"), attr("is valid", true)],
             data: Some(to_binary(&true)?),
         })
@@ -129,8 +130,8 @@ pub fn execute_set_flags_address(
     }
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
+        events: vec![],
         attributes: vec![
             attr("action", "flags address updated"),
             attr("previous", previous),
@@ -157,8 +158,8 @@ pub fn execute_set_flagging_threshold(
     }
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
+        events: vec![],
         attributes: vec![
             attr("action", "flagging threshold updated"),
             attr("previous", previous_ft),
