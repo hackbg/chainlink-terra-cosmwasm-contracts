@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, OverflowError,
-    OverflowOperation, Response, StdError, StdResult, Storage, Timestamp, Uint128, WasmMsg,
+    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, OverflowError,
+    OverflowOperation, Response, StdError, StdResult, Storage, SubMsg, Timestamp, Uint128, WasmMsg,
 };
 use cw20::{BalanceResponse, Cw20ReceiveMsg};
 use deviation_flagging_validator::msg::ExecuteMsg as ValidatorMsg;
@@ -164,7 +164,7 @@ pub fn execute_submit(
     if submission > max_submission_value {
         return Err(ContractError::OverMax {});
     }
-    let mut messages: Vec<CosmosMsg> = vec![];
+    let mut messages = vec![];
     let mut attributes = vec![];
     let timestamp = timestamp_to_seconds(env.block.time);
 
@@ -244,7 +244,7 @@ pub fn execute_submit(
             deps.storage,
             round_id.into(),
             &Round {
-                answer: Some(Uint128(new_answer)),
+                answer: Some(Uint128::new(new_answer)),
                 started_at: round.started_at,
                 updated_at: Some(timestamp),
                 answered_in_round: round_id,
@@ -253,26 +253,25 @@ pub fn execute_submit(
         LATEST_ROUND_ID.save(deps.storage, &round_id)?;
         attributes.extend_from_slice(&[
             attr("action", "answer_updated"),
-            attr("current", Uint128(new_answer)),
+            attr("current", Uint128::new(new_answer)),
             attr("round_id", round_id),
         ]);
 
         let previous_round_id = prev_round_id(round_id)?;
         let prev_round = ROUNDS.load(deps.storage, previous_round_id.into())?;
         // Send value to validator
-        messages.push(
-            WasmMsg::Execute {
-                contract_addr: validator.to_string(),
-                msg: to_binary(&ValidatorMsg::Validate {
-                    previous_round_id,
-                    previous_answer: prev_round.answer.unwrap_or_default(),
-                    round_id,
-                    answer: Uint128(new_answer),
-                })?,
-                send: vec![],
-            }
-            .into(),
-        );
+        let validator_msg = WasmMsg::Execute {
+            contract_addr: validator.to_string(),
+            msg: to_binary(&ValidatorMsg::Validate {
+                previous_round_id,
+                previous_answer: prev_round.answer.unwrap_or_default(),
+                round_id,
+                answer: Uint128::new(new_answer),
+            })?,
+            funds: vec![],
+        };
+
+        messages.push(SubMsg::new(validator_msg));
     }
     // pay oracle
     let payment = round_details.payment_amount;
@@ -295,7 +294,7 @@ pub fn execute_submit(
 
     Ok(Response {
         messages,
-        submessages: vec![],
+        events: vec![],
         attributes,
         data: None,
     })
@@ -477,7 +476,7 @@ pub fn execute_change_oracles(
 
     Ok(Response {
         messages: vec![],
-        submessages: vec![],
+        events: vec![],
         attributes, // TODO: add more logs
         data: None,
     })
@@ -578,7 +577,7 @@ pub fn execute_transfer_admin(
 
     Ok(Response {
         messages: vec![],
-        submessages: vec![],
+        events: vec![],
         attributes: vec![
             attr("action", "transfer_admin"),
             attr("oracle", oracle),
@@ -614,7 +613,7 @@ pub fn execute_accept_admin(
 
     Ok(Response {
         messages: vec![],
-        submessages: vec![],
+        events: vec![],
         attributes: vec![
             attr("oracle_admin_updated", oracle),
             attr("new_admin", info.sender),
@@ -663,7 +662,7 @@ pub fn execute_request_new_round(
     let round_id_serialized = to_binary(&new_round_id)?;
     Ok(Response {
         messages: vec![],
-        submessages: vec![],
+        events: vec![],
         attributes: vec![
             attr("action", "new_round"),
             attr("round_id", new_round_id),
@@ -713,12 +712,12 @@ pub fn execute_withdraw_payment(
     let transfer_msg = WasmMsg::Execute {
         contract_addr: link.to_string(),
         msg: to_binary(&LinkMsg::Transfer { recipient, amount })?,
-        send: vec![],
+        funds: vec![],
     };
 
     Ok(Response {
-        messages: vec![transfer_msg.into()],
-        submessages: vec![],
+        messages: vec![SubMsg::new(transfer_msg)],
+        events: vec![],
         attributes: vec![],
         data: None,
     })
@@ -735,7 +734,7 @@ pub fn execute_withdraw_funds(
 
     let funds = RECORDED_FUNDS.load(deps.storage)?;
     let payment_amount = CONFIG.load(deps.storage)?.payment_amount;
-    let oracle_count = get_oracle_count(deps.as_ref(), env.clone())?;
+    let oracle_count = get_oracle_count(deps.as_ref(), env)?;
     let available = funds
         .available
         .checked_sub(required_reserve(payment_amount, oracle_count))
@@ -747,36 +746,24 @@ pub fn execute_withdraw_funds(
 
     let link = CONFIG.load(deps.storage)?.link;
 
+    let attributes = match update_available_funds(deps, available - amount)? {
+        Some(funds) => vec![
+            attr("action", "update_available_funds"),
+            attr("amount", funds),
+        ],
+        None => vec![],
+    };
+
     let transfer_msg = WasmMsg::Execute {
         contract_addr: link.to_string(),
         msg: to_binary(&LinkMsg::Transfer { recipient, amount })?,
-        send: vec![],
-    };
-    let update_funds_msg = WasmMsg::Execute {
-        contract_addr: env.contract.address.to_string(),
-        msg: to_binary(&ExecuteMsg::UpdateAvailableFunds {})?,
-        send: vec![],
+        funds: vec![],
     };
 
     Ok(Response {
-        messages: vec![transfer_msg.into(), update_funds_msg.into()],
-        submessages: vec![],
-        // TODO: assess if submessages would be an improvement here
-        // submessages: vec![
-        //     SubMsg {
-        //         id: 0,
-        //         msg: transfer_msg.into(),
-        //         gas_limit: None,
-        //         reply_on: ReplyOn::Always,
-        //     },
-        //     SubMsg {
-        //         id: 1,
-        //         msg: update_funds_msg.into(),
-        //         gas_limit: None,
-        //         reply_on: ReplyOn::Always,
-        //     },
-        // ],
-        attributes: vec![],
+        messages: vec![SubMsg::new(transfer_msg)],
+        events: vec![],
+        attributes,
         data: None,
     })
 }
@@ -794,14 +781,31 @@ pub fn execute_update_available_funds(
         },
     )?;
 
+    match update_available_funds(deps, prev_available.balance)? {
+        Some(now_available) => Ok(Response {
+            messages: vec![],
+            events: vec![],
+            attributes: vec![
+                attr("action", "update_available_funds"),
+                attr("amount", now_available),
+            ],
+            data: None,
+        }),
+        None => Ok(Response::default()),
+    }
+}
+
+fn update_available_funds(
+    deps: DepsMut,
+    prev_available: Uint128,
+) -> Result<Option<Uint128>, ContractError> {
     let funds = RECORDED_FUNDS.load(deps.storage)?;
     let now_available = prev_available
-        .balance
         .checked_sub(funds.allocated)
         .map_err(StdError::from)?;
 
     if funds.available == now_available {
-        return Ok(Response::default());
+        return Ok(None);
     }
     RECORDED_FUNDS.save(
         deps.storage,
@@ -811,15 +815,7 @@ pub fn execute_update_available_funds(
         },
     )?;
 
-    Ok(Response {
-        messages: vec![],
-        submessages: vec![],
-        attributes: vec![
-            attr("action", "update_available_funds"),
-            attr("amount", now_available),
-        ],
-        data: None,
-    })
+    Ok(Some(now_available))
 }
 
 pub fn execute_set_requester_permissions(
@@ -856,7 +852,7 @@ pub fn execute_set_requester_permissions(
 
     Ok(Response {
         messages: vec![],
-        submessages: vec![],
+        events: vec![],
         attributes: vec![
             attr("action", "set_requester_permission"),
             attr("requester", requester),
@@ -912,7 +908,7 @@ pub fn execute_update_future_rounds(
 
     Ok(Response {
         messages: vec![],
-        submessages: vec![],
+        events: vec![],
         attributes: vec![
             attr("action", "round_details_updated"),
             attr("payment_amount", payment_amount),
@@ -948,7 +944,7 @@ pub fn execute_set_validator(
 
     Ok(Response {
         messages: vec![],
-        submessages: vec![],
+        events: vec![],
         attributes: vec![
             attr("action", "validator_updated"),
             attr("previous", old_validator.to_string()),
@@ -970,12 +966,12 @@ pub fn execute_receive(
     let msg = WasmMsg::Execute {
         contract_addr: env.contract.address.to_string(),
         msg: to_binary(&ExecuteMsg::UpdateAvailableFunds {})?,
-        send: vec![],
+        funds: vec![],
     };
 
     Ok(Response {
-        messages: vec![msg.into()],
-        submessages: vec![],
+        messages: vec![SubMsg::new(msg)],
+        events: vec![],
         attributes: vec![],
         data: None,
     })
@@ -1000,7 +996,7 @@ pub fn execute_transfer_ownership(
 }
 
 fn required_reserve(payment: Uint128, oracle_count: u8) -> Uint128 {
-    Uint128(payment.u128() * oracle_count as u128 * RESERVE_ROUNDS)
+    Uint128::new(payment.u128() * oracle_count as u128 * RESERVE_ROUNDS)
 }
 
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {

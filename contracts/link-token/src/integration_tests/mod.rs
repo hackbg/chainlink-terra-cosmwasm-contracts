@@ -42,7 +42,7 @@ fn test_successful_init() {
         name: TOKEN_NAME.to_string(),
         symbol: TOKEN_SYMBOL.to_string(),
         decimals: DECIMALS,
-        total_supply: Uint128(TOTAL_SUPPLY),
+        total_supply: Uint128::new(TOTAL_SUPPLY),
     };
 
     let state: TokenInfoResponse = router
@@ -65,7 +65,7 @@ fn test_transfer_success() {
 
     let msg = ExecuteMsg::Transfer {
         recipient: recipient_addr.to_owned(),
-        amount: Uint128(128),
+        amount: Uint128::new(128),
     };
 
     router
@@ -77,7 +77,7 @@ fn test_transfer_success() {
     };
     let balance: BalanceResponse = router.wrap().query_wasm_smart(contract, &query).unwrap();
 
-    assert_eq!(balance.balance, Uint128(128));
+    assert_eq!(balance.balance, Uint128::new(128));
 }
 
 #[test]
@@ -89,8 +89,8 @@ fn test_transfer_underflow() {
         .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK")
         .unwrap();
 
-    let balance = Uint128(TOTAL_SUPPLY);
-    let amount = balance + Uint128(1);
+    let balance = Uint128::new(TOTAL_SUPPLY);
+    let amount = balance + Uint128::new(1);
 
     let msg = ExecuteMsg::Transfer {
         recipient: MOCK_CONTRACT_ADDR.into(),
@@ -130,13 +130,13 @@ fn test_queries() {
             },
         )
         .unwrap();
-    assert_eq!(balance_res.balance, Uint128(TOTAL_SUPPLY));
+    assert_eq!(balance_res.balance, Uint128::new(TOTAL_SUPPLY));
 
     let expected_info = TokenInfoResponse {
         name: TOKEN_NAME.to_string(),
         symbol: TOKEN_SYMBOL.to_string(),
         decimals: DECIMALS,
-        total_supply: Uint128(TOTAL_SUPPLY),
+        total_supply: Uint128::new(TOTAL_SUPPLY),
     };
     let token_info: TokenInfoResponse = router
         .wrap()
@@ -171,7 +171,7 @@ fn test_modify_allowance() {
 
     let msg = ExecuteMsg::IncreaseAllowance {
         spender: spender_addr.to_owned(),
-        amount: Uint128(100),
+        amount: Uint128::new(100),
         expires: None,
     };
     router
@@ -189,14 +189,14 @@ fn test_modify_allowance() {
 
     let msg = ExecuteMsg::DecreaseAllowance {
         spender: spender_addr.to_owned(),
-        amount: Uint128(50),
+        amount: Uint128::new(50),
         expires: None,
     };
     router
         .execute_contract(owner.clone(), contract.clone(), &msg, &[])
         .unwrap();
 
-    assert_eq!(allowance.allowance, Uint128(100));
+    assert_eq!(allowance.allowance, Uint128::new(100));
 
     let allowance_query = QueryMsg::Allowance {
         owner: owner.to_string(),
@@ -207,7 +207,7 @@ fn test_modify_allowance() {
         .query_wasm_smart(contract.clone(), &allowance_query)
         .unwrap();
 
-    assert_eq!(allowance.allowance, Uint128(50));
+    assert_eq!(allowance.allowance, Uint128::new(50));
 }
 
 #[test]
@@ -221,7 +221,7 @@ fn test_transfer_from() {
 
     let spender = Addr::unchecked("spender");
     let recipient = Addr::unchecked("recipient");
-    let amount = Uint128(100);
+    let amount = Uint128::new(100);
 
     let msg = ExecuteMsg::IncreaseAllowance {
         spender: spender.to_string(),
@@ -300,7 +300,7 @@ fn test_transfer_from_without_allowance() {
     let msg = ExecuteMsg::TransferFrom {
         owner: owner.to_string(),
         recipient: recipient.to_owned(),
-        amount: Uint128(100),
+        amount: Uint128::new(100),
     };
     let res = router.execute_contract(owner, contract, &msg, &[]);
 
@@ -318,7 +318,7 @@ fn test_change_allowance_self() {
 
     let msg = ExecuteMsg::IncreaseAllowance {
         spender: owner.to_string(),
-        amount: Uint128(1000),
+        amount: Uint128::new(1000),
         expires: None,
     };
     let res = router.execute_contract(owner, contract, &msg, &[]);
@@ -349,7 +349,7 @@ fn test_send() {
         )
         .unwrap();
 
-    let amount = Uint128(10000);
+    let amount = Uint128::new(10000);
     let payload = to_binary(&PingMsg {
         payload: "test_data".to_string(),
     })
@@ -364,7 +364,10 @@ fn test_send() {
     let res = router
         .execute_contract(owner.clone(), contract.clone(), &send_msg, &[])
         .unwrap();
-    assert_eq!(res.attributes.last().unwrap(), &attr("action", "pong"));
+    let event = res.events.last().unwrap();
+    let attribute = event.attributes.last().unwrap();
+
+    assert_eq!(attribute, &attr("action", "pong"));
 
     let sender_balance: BalanceResponse = router
         .wrap()
@@ -375,7 +378,7 @@ fn test_send() {
             },
         )
         .unwrap();
-    let expected_balance = Uint128(TOTAL_SUPPLY).checked_sub(amount).unwrap();
+    let expected_balance = Uint128::new(TOTAL_SUPPLY).checked_sub(amount).unwrap();
     assert_eq!(sender_balance.balance, expected_balance);
 
     let receiver_balance: BalanceResponse = router
