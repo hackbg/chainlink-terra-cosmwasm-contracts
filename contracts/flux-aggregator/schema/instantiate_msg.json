@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "InstantiateMsg",
+  "type": "object",
+  "required": [
+    "decimals",
+    "description",
+    "link",
+    "max_submission_value",
+    "min_submission_value",
+    "payment_amount",
+    "timeout",
+    "validator"
+  ],
+  "properties": {
+    "decimals": {
+      "description": "The number of decimals to offset the answer by",
+      "type": "integer",
+      "format": "uint8",
+      "minimum": 0.0
+    },
+    "description": {
+      "description": "A short description of what is being reported",
+      "type": "string"
+    },
+    "link": {
+      "description": "LINK token address",
+      "type": "string"
+    },
+    "max_submission_value": {
+      "description": "An immutable check for an upper bound of what submission values are accepted from an oracle",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Uint128"
+        }
+      ]
+    },
+    "min_submission_value": {
+      "description": "An immutable check for a lower bound of what submission values are accepted from an oracle",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Uint128"
+        }
+      ]
+    },
+    "payment_amount": {
+      "description": "Amount of LINK paid to each oracle per submission",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Uint128"
+        }
+      ]
+    },
+    "timeout": {
+      "description": "The number of seconds after the previous round that are allowed to lapse before allowing an oracle to skip an unfinished round",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "validator": {
+      "description": "Address to external data validation",
+      "type": "string"
+    }
+  },
+  "definitions": {
+    "Uint128": {
+      "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+      "type": "string"
+    }
+  }
+}
