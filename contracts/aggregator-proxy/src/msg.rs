@@ -1,21 +1,21 @@
-use cosmwasm_std::{CanonicalAddr, HumanAddr};
+use cosmwasm_std::Addr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-pub type PhaseAggregators = Vec<(u16, HumanAddr)>;
+pub type PhaseAggregators = Vec<(u16, Addr)>;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InitMsg {
-    pub aggregator: HumanAddr,
+pub struct InstantiateMsg {
+    pub aggregator: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum HandleMsg {
-    ProposeAggregator { aggregator: HumanAddr },
-    ConfirmAggregator { aggregator: HumanAddr },
+pub enum ExecuteMsg {
+    ProposeAggregator { aggregator: String },
+    ConfirmAggregator { aggregator: String },
     // owned
-    TransferOwnership { to: CanonicalAddr },
+    TransferOwnership { to: Addr },
     AcceptOwnership {},
 }
 

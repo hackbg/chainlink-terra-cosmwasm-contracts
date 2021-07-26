@@ -4,33 +4,25 @@ version = "0.1.0"
 authors = ["Milen Radkov <milenradkov@me.com>"]
 edition = "2018"
 
-exclude = [
-  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
-  "contract.wasm",
-  "hash.txt",
-]
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["singlepass"]
-# for quicker tests, cargo test --lib
 # for more explicit tests, cargo test --features=backtraces
-backtraces = ["cosmwasm-std/backtraces", "cosmwasm-vm/backtraces"]
-singlepass = ["cosmwasm-vm/default-singlepass"]
+backtraces = ["cosmwasm-std/backtraces"]
 
 [dependencies]
-cosmwasm-std = { version = "0.10.1", features = ["iterator"] }
-cosmwasm-storage = { version = "0.10.1", features = ["iterator"] }
-schemars = "0.7"
+cosmwasm-std = { version = "0.15.0" }
+cosmwasm-storage = { version = "0.15.0" }
+cw-storage-plus = { version = "0.7.0", features = ["iterator"] }
+schemars = "0.8.3"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
-snafu = { version = "0.6.3" }
+thiserror = { version = "1.0.24" }
 owned = { path = "../owned", default-features = false, features = ["library"] }
 flux-aggregator = { path = "../flux-aggregator", default-features = false }
 
 [dev-dependencies]
-cosmwasm-schema = { version = "0.10.1" }
-cosmwasm-vm = { version = "0.10.1", default-features = false, features = ["iterator"] }
+cosmwasm-schema = { version = "0.15.0" }
+cw-multi-test = { version = "0.7.0" }

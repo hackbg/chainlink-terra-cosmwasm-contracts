@@ -1,234 +1,224 @@
 use std::convert::TryInto;
 
 use cosmwasm_std::{
-    to_binary, Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr, InitResponse,
-    Order, Querier, QueryRequest, StdError, StdResult, Storage, Uint128, WasmQuery,
+    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult,
+    Storage, Uint128,
 };
 use flux_aggregator::msg::{ConfigResponse, QueryMsg as AggregatorQueryMsg, RoundDataResponse};
-use owned::{
-    contract::{get_owner, handle_accept_ownership, handle_transfer_ownership, init as owned_init},
-    state::owner_read,
+use owned::contract::{
+    execute_accept_ownership, execute_transfer_ownership, get_owner,
+    instantiate as owned_instantiate,
 };
 
 use crate::{
-    msg::{HandleMsg, InitMsg, PhaseAggregators, QueryMsg},
-    state::{
-        current_phase, current_phase_read, get_phase_aggregator, phase_aggregators_read,
-        proposed_aggregator, proposed_aggregator_read, set_phase_aggregator, Phase,
-    },
+    error::ContractError,
+    msg::{ExecuteMsg, InstantiateMsg, PhaseAggregators, QueryMsg},
+    state::{Phase, CURRENT_PHASE, PHASE_AGGREGATORS, PROPOSED_AGGREGATOR},
 };
 
-static PHASE_OFFSET: Uint128 = Uint128(64);
+static PHASE_OFFSET: Uint128 = Uint128::new(64);
 
-pub fn init<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn instantiate(
+    mut deps: DepsMut,
     env: Env,
-    msg: InitMsg,
-) -> StdResult<InitResponse> {
-    owned_init(deps, env, owned::msg::InitMsg {})?;
+    info: MessageInfo,
+    msg: InstantiateMsg,
+) -> Result<Response, ContractError> {
+    owned_instantiate(deps.branch(), env, info, owned::msg::InstantiateMsg {})?;
 
-    let aggregator_addr = deps.api.canonical_address(&msg.aggregator)?;
+    let aggregator_addr = deps.api.addr_validate(&msg.aggregator)?;
 
-    set_phase_aggregator(&mut deps.storage, 1, &aggregator_addr)?;
-    current_phase(&mut deps.storage).save(&Phase {
-        id: 1,
-        aggregator_addr,
-    })?;
+    PHASE_AGGREGATORS.save(deps.storage, 1.into(), &aggregator_addr)?;
+    CURRENT_PHASE.save(
+        deps.storage,
+        &Phase {
+            id: 1,
+            aggregator_addr,
+        },
+    )?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
-pub fn handle<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn execute(
+    deps: DepsMut,
     env: Env,
-    msg: HandleMsg,
-) -> StdResult<HandleResponse> {
+    info: MessageInfo,
+    msg: ExecuteMsg,
+) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::ProposeAggregator { aggregator } => {
-            handle_propose_aggregator(deps, env, aggregator)
+        ExecuteMsg::ProposeAggregator { aggregator } => {
+            execute_propose_aggregator(deps, env, info, aggregator)
         }
-        HandleMsg::ConfirmAggregator { aggregator } => {
-            handle_confirm_aggregator(deps, env, aggregator)
+        ExecuteMsg::ConfirmAggregator { aggregator } => {
+            execute_confirm_aggregator(deps, env, info, aggregator)
         }
-        HandleMsg::TransferOwnership { to } => handle_transfer_ownership(deps, env, to),
-        HandleMsg::AcceptOwnership {} => handle_accept_ownership(deps, env),
+        ExecuteMsg::TransferOwnership { to } => {
+            execute_transfer_ownership(deps, env, info, to).map_err(ContractError::from)
+        }
+        ExecuteMsg::AcceptOwnership {} => {
+            execute_accept_ownership(deps, env, info).map_err(ContractError::from)
+        }
     }
 }
 
-pub fn handle_propose_aggregator<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
-    aggregator: HumanAddr,
-) -> StdResult<HandleResponse> {
-    let sender = deps.api.canonical_address(&env.message.sender)?;
-    if sender != owner_read(&deps.storage).load()?.owner {
-        return Err(StdError::generic_err("Not owner"));
-    }
+pub fn execute_propose_aggregator(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    aggregator: String,
+) -> Result<Response, ContractError> {
+    validate_ownership(deps.as_ref(), &info)?;
 
-    let aggregator_addr = deps.api.canonical_address(&aggregator)?;
-    proposed_aggregator(&mut deps.storage).save(&aggregator_addr)?;
+    let aggregator_addr = deps.api.addr_validate(&aggregator)?;
+    PROPOSED_AGGREGATOR.save(deps.storage, &aggregator_addr)?;
 
-    Ok(HandleResponse::default())
+    Ok(Response::default())
 }
 
-pub fn handle_confirm_aggregator<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
-    aggregator: HumanAddr,
-) -> StdResult<HandleResponse> {
-    let sender = deps.api.canonical_address(&env.message.sender)?;
-    if sender != owner_read(&deps.storage).load()?.owner {
-        return Err(StdError::generic_err("Not owner"));
-    }
-    let aggregator_addr = deps.api.canonical_address(&aggregator)?;
-    let proposed = proposed_aggregator_read(&deps.storage)
-        .may_load()?
-        .ok_or_else(|| StdError::generic_err("Invalid proposed aggregator"))?;
+pub fn execute_confirm_aggregator(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    aggregator: String,
+) -> Result<Response, ContractError> {
+    validate_ownership(deps.as_ref(), &info)?;
+
+    let aggregator_addr = deps.api.addr_validate(&aggregator)?;
+
+    let proposed = PROPOSED_AGGREGATOR
+        .may_load(deps.storage)?
+        .ok_or(ContractError::InvalidProposedAggregator {})?;
     if proposed != aggregator_addr {
-        return Err(StdError::generic_err("Invalid proposed aggregator"));
+        return Err(ContractError::InvalidProposedAggregator {});
     }
 
-    proposed_aggregator(&mut deps.storage).remove();
+    PROPOSED_AGGREGATOR.remove(deps.storage);
 
-    let phase = current_phase(&mut deps.storage).load()?;
+    let phase = CURRENT_PHASE.load(deps.storage)?;
     let new_id = phase.id + 1;
-    set_phase_aggregator(&mut deps.storage, new_id, &aggregator_addr)?;
-    current_phase(&mut deps.storage).save(&Phase {
-        id: new_id,
-        aggregator_addr,
-    })?;
+    PHASE_AGGREGATORS.save(deps.storage, new_id.into(), &aggregator_addr)?;
+    CURRENT_PHASE.save(
+        deps.storage,
+        &Phase {
+            id: new_id,
+            aggregator_addr,
+        },
+    )?;
 
-    Ok(HandleResponse::default())
+    Ok(Response::default())
 }
 
-pub fn query<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    msg: QueryMsg,
-) -> StdResult<Binary> {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetPhaseAggregators {} => to_binary(&get_phase_aggregators(deps)),
-        QueryMsg::GetRoundData { round_id } => to_binary(&get_round_data(deps, round_id)),
-        QueryMsg::GetLatestRoundData {} => to_binary(&get_latest_round_data(deps)),
+        QueryMsg::GetPhaseAggregators {} => to_binary(&get_phase_aggregators(deps, env)?),
+        QueryMsg::GetRoundData { round_id } => to_binary(&get_round_data(deps, env, round_id)?),
+        QueryMsg::GetLatestRoundData {} => to_binary(&get_latest_round_data(deps, env)?),
         QueryMsg::GetProposedRoundData { round_id } => {
-            to_binary(&get_proposed_round_data(deps, round_id))
+            to_binary(&get_proposed_round_data(deps, env, round_id)?)
         }
-        QueryMsg::GetProposedLatestRoundData {} => to_binary(&get_proposed_latest_round_data(deps)),
-        QueryMsg::GetProposedAggregator {} => to_binary(&get_proposed_aggregator(deps)),
-        QueryMsg::GetAggregator {} => to_binary(&get_aggregator(deps)),
-        QueryMsg::GetPhaseId {} => to_binary(&get_phase_id(deps)),
-        QueryMsg::GetDecimals {} => to_binary(&get_decimals(deps)),
-        QueryMsg::GetDescription {} => to_binary(&get_description(deps)),
-        QueryMsg::GetOwner {} => to_binary(&get_owner(deps)),
+        QueryMsg::GetProposedLatestRoundData {} => {
+            to_binary(&get_proposed_latest_round_data(deps, env)?)
+        }
+        QueryMsg::GetProposedAggregator {} => to_binary(&get_proposed_aggregator(deps, env)?),
+        QueryMsg::GetAggregator {} => to_binary(&get_aggregator(deps, env)?),
+        QueryMsg::GetPhaseId {} => to_binary(&get_phase_id(deps, env)?),
+        QueryMsg::GetDecimals {} => to_binary(&get_decimals(deps, env)?),
+        QueryMsg::GetDescription {} => to_binary(&get_description(deps, env)?),
+        QueryMsg::GetOwner {} => to_binary(&get_owner(deps)?),
     }
 }
 
-macro_rules! query {
-    ($deps:ident, $addr:ident, $query_type:ident $($prop_val:ident), * => $ret:ty) => {{
-        let query = QueryRequest::<()>::Wasm(WasmQuery::Smart {
-            contract_addr: $deps.api.human_address(&$addr)?,
-            msg: to_binary(&AggregatorQueryMsg::$query_type {
-                $(
-                    $prop_val,
-                )*
-            })?,
-        });
-        let res: StdResult<$ret> = $deps.querier.custom_query(&query)?;
-        res
-    }};
-}
-
-pub fn get_phase_aggregators<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-) -> StdResult<PhaseAggregators> {
-    phase_aggregators_read(&deps.storage)
-        .range(None, None, Order::Ascending)
+pub fn get_phase_aggregators(deps: Deps, _env: Env) -> StdResult<PhaseAggregators> {
+    PHASE_AGGREGATORS
+        .range(deps.storage, None, None, Order::Ascending)
         .map(|entry| {
-            entry.and_then(|aggregator| {
-                Ok((
+            entry.map(|aggregator| {
+                (
                     u16::from_be_bytes(aggregator.0.as_slice().try_into().unwrap()),
-                    deps.api.human_address(&aggregator.1)?,
-                ))
+                    aggregator.1,
+                )
             })
         })
         .collect()
 }
 
-pub fn get_round_data<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    round_id: u32,
-) -> StdResult<RoundDataResponse> {
-    let phase_id = (round_id >> PHASE_OFFSET.u128())
+pub fn get_round_data(deps: Deps, _env: Env, round_id: u32) -> StdResult<RoundDataResponse> {
+    let phase_id: u16 = (round_id >> PHASE_OFFSET.u128())
         .try_into()
+        // TODO improve error
         .map_err(|_| StdError::generic_err("Failed parse"))?;
-    let aggregator = get_phase_aggregator(&deps.storage, phase_id)?;
-    let res = query!(deps, aggregator, GetRoundData round_id => RoundDataResponse)?;
+    let aggregator = PHASE_AGGREGATORS.load(deps.storage, phase_id.into())?;
+    let res: RoundDataResponse = deps
+        .querier
+        .query_wasm_smart(aggregator, &AggregatorQueryMsg::GetRoundData { round_id })?;
     Ok(add_phase_ids(res, phase_id))
 }
 
-pub fn get_latest_round_data<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-) -> StdResult<RoundDataResponse> {
+pub fn get_latest_round_data(deps: Deps, _env: Env) -> StdResult<RoundDataResponse> {
     let Phase {
         aggregator_addr,
         id,
-    } = current_phase_read(&deps.storage).load()?;
-    let res = query!(deps, aggregator_addr, GetLatestRoundData => RoundDataResponse)?;
+    } = CURRENT_PHASE.load(deps.storage)?;
+    let res: RoundDataResponse = deps
+        .querier
+        .query_wasm_smart(aggregator_addr, &AggregatorQueryMsg::GetLatestRoundData {})?;
     Ok(add_phase_ids(res, id))
 }
 
-pub fn get_proposed_round_data<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+pub fn get_proposed_round_data(
+    deps: Deps,
+    _env: Env,
     round_id: u32,
 ) -> StdResult<RoundDataResponse> {
-    let proposed = get_proposed(&deps.storage)?;
-    query!(deps, proposed, GetRoundData round_id => RoundDataResponse)
+    let proposed = get_proposed(deps.storage)?;
+    deps.querier
+        .query_wasm_smart(proposed, &AggregatorQueryMsg::GetRoundData { round_id })
 }
 
-pub fn get_proposed_latest_round_data<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-) -> StdResult<RoundDataResponse> {
-    let proposed = get_proposed(&deps.storage)?;
-    query!(deps, proposed, GetLatestRoundData => RoundDataResponse)
+pub fn get_proposed_latest_round_data(deps: Deps, _env: Env) -> StdResult<RoundDataResponse> {
+    let proposed = get_proposed(deps.storage)?;
+    deps.querier
+        .query_wasm_smart(proposed, &AggregatorQueryMsg::GetLatestRoundData {})
 }
 
-pub fn get_proposed_aggregator<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-) -> StdResult<HumanAddr> {
-    proposed_aggregator_read(&deps.storage)
-        .load()
-        .and_then(|aggregator_addr| deps.api.human_address(&aggregator_addr))
+pub fn get_proposed_aggregator(deps: Deps, _env: Env) -> StdResult<Addr> {
+    PROPOSED_AGGREGATOR.load(deps.storage)
 }
 
-pub fn get_aggregator<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-) -> StdResult<HumanAddr> {
-    current_phase_read(&deps.storage)
-        .load()
-        .and_then(|phase| deps.api.human_address(&phase.aggregator_addr))
+pub fn get_aggregator(deps: Deps, _env: Env) -> StdResult<Addr> {
+    CURRENT_PHASE
+        .load(deps.storage)
+        .map(|phase| phase.aggregator_addr)
 }
 
-pub fn get_phase_id<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<u16> {
-    Ok(current_phase_read(&deps.storage).load()?.id)
+pub fn get_phase_id(deps: Deps, _env: Env) -> StdResult<u16> {
+    Ok(CURRENT_PHASE.load(deps.storage)?.id)
 }
 
-pub fn get_decimals<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<u8> {
-    let aggregator_addr = current_phase_read(&deps.storage).load()?.aggregator_addr;
-    let res = query!(deps, aggregator_addr, GetAggregatorConfig => ConfigResponse)?;
+pub fn get_decimals(deps: Deps, _env: Env) -> StdResult<u8> {
+    let aggregator_addr = CURRENT_PHASE.load(deps.storage)?.aggregator_addr;
+    let res: ConfigResponse = deps
+        .querier
+        .query_wasm_smart(aggregator_addr, &AggregatorQueryMsg::GetAggregatorConfig {})?;
+
     Ok(res.decimals)
 }
 
-pub fn get_description<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-) -> StdResult<String> {
-    let aggregator_addr = current_phase_read(&deps.storage).load()?.aggregator_addr;
-    let res = query!(deps, aggregator_addr, GetAggregatorConfig => ConfigResponse)?;
+pub fn get_description(deps: Deps, _env: Env) -> StdResult<String> {
+    let aggregator_addr = CURRENT_PHASE.load(deps.storage)?.aggregator_addr;
+    let res: ConfigResponse = deps
+        .querier
+        .query_wasm_smart(aggregator_addr, &AggregatorQueryMsg::GetAggregatorConfig {})?;
+
     Ok(res.description)
 }
 
-fn get_proposed<S: Storage>(storage: &S) -> StdResult<CanonicalAddr> {
-    proposed_aggregator_read(storage)
-        .may_load()?
-        .ok_or_else(|| StdError::generic_err("No proposed aggregator present"))
+fn get_proposed(storage: &dyn Storage) -> StdResult<Addr> {
+    PROPOSED_AGGREGATOR
+        .may_load(storage)?
+        .ok_or(ContractError::NoProposedAggregator {})
+        .map_err(|err| StdError::generic_err(err.to_string()))
 }
 
 fn add_phase_ids(round_data: RoundDataResponse, phase_id: u16) -> RoundDataResponse {
@@ -243,6 +233,14 @@ fn add_phase_ids(round_data: RoundDataResponse, phase_id: u16) -> RoundDataRespo
 
 fn add_phase(phase: u16, original_id: u32) -> u32 {
     (phase as u32) << PHASE_OFFSET.u128() | original_id
+}
+
+fn validate_ownership(deps: Deps, info: &MessageInfo) -> Result<(), ContractError> {
+    let owner = get_owner(deps)?;
+    if info.sender != owner {
+        return Err(ContractError::NotOwner {});
+    }
+    Ok(())
 }
 
 // #[cfg(test)]

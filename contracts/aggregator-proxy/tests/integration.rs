@@ -1,6 +1,6 @@
 mod helpers;
 
-use aggregator_proxy::msg::{HandleMsg, InitMsg, PhaseAggregators, QueryMsg};
+use aggregator_proxy::msg::{ExecuteMsg, InstantiateMsg, PhaseAggregators, QueryMsg};
 use cosmwasm_std::{from_binary, Env, HandleResponse, HumanAddr, InitResponse, StdResult};
 use cosmwasm_vm::{
     testing::{handle, init, mock_env, query, MockApi, MockStorage},
@@ -33,7 +33,7 @@ fn propose_aggregator() {
 
     let (mut deps, _) = init_contract();
 
-    let msg = HandleMsg::ProposeAggregator {
+    let msg = ExecuteMsg::ProposeAggregator {
         aggregator: new_aggregator.clone(),
     };
 
@@ -54,14 +54,14 @@ fn confirm_aggregator() {
 
     let (mut deps, env) = init_contract();
 
-    let msg = HandleMsg::ProposeAggregator {
+    let msg = ExecuteMsg::ProposeAggregator {
         aggregator: new_aggregator.clone(),
     };
     let _: HandleResponse = handle(&mut deps, env.clone(), &msg).unwrap();
     let aggregator = q!(deps, GetProposedAggregator => HumanAddr);
     assert_eq!(aggregator, new_aggregator);
 
-    let msg = HandleMsg::ConfirmAggregator {
+    let msg = ExecuteMsg::ConfirmAggregator {
         aggregator: new_aggregator.clone(),
     };
 
@@ -84,7 +84,7 @@ fn confirm_aggregator() {
 }
 
 fn init_contract() -> (Instance<MockStorage, MockApi, CustomQuerier>, Env) {
-    let msg = InitMsg {
+    let msg = InstantiateMsg {
         aggregator: HumanAddr::from(AGGREGATOR),
     };
     let custom = mock_dependencies_with_custom_querier();
