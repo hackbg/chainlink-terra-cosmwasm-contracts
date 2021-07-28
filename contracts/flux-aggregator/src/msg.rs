@@ -132,7 +132,7 @@ pub enum QueryMsg {
     GetOwner {},
     /// Returns the settings of the flux aggregator
     /// Response: [`ConfigResponse`]
-    GetAggregatorConfig {},
+    // GetAggregatorConfig {},
     /// Get the amount of payment yet to be withdrawn by oracles.
     /// Response: [`Uint128`].
     GetAllocatedFunds {},
@@ -159,19 +159,20 @@ pub enum QueryMsg {
     },
     /// Query data for a specific round
     /// Response: [`RoundDataResponse`].
-    GetRoundData {
-        /// The round ID to retrieve the round data for
-        round_id: u32,
-    },
+    // GetRoundData {
+    //     /// The round ID to retrieve the round data for
+    //     round_id: u32,
+    // },
     /// Query data for the latest round
     /// Response: [`RoundDataResponse`].
-    GetLatestRoundData {},
+    // GetLatestRoundData {},
     /// Get status of specific oracle
     /// Response: [`OracleStatus`].
     GetOracleStatus {
         /// Oracle address to look up for
         oracle: String,
     },
+    AggregatorQuery(chainlink_aggregator::QueryMsg),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

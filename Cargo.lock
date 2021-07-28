@@ -177,6 +177,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "chainlink-aggregator"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-std 0.15.0",
+ "schemars 0.8.3",
+ "serde",
+]
+
+[[package]]
 name = "chainlink-client"
 version = "0.1.0"
 dependencies = [
@@ -636,6 +645,7 @@ dependencies = [
 name = "flux-aggregator"
 version = "0.1.0"
 dependencies = [
+ "chainlink-aggregator",
  "cosmwasm-schema 0.15.0",
  "cosmwasm-std 0.15.0",
  "cosmwasm-storage 0.15.0",

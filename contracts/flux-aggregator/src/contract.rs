@@ -1,3 +1,4 @@
+use chainlink_aggregator::QueryMsg::*;
 use cosmwasm_std::{
     attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, OverflowError,
     OverflowOperation, Response, StdError, StdResult, Storage, SubMsg, Timestamp, Uint128, WasmMsg,
@@ -1001,7 +1002,7 @@ fn required_reserve(payment: Uint128, oracle_count: u8) -> Uint128 {
 
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetAggregatorConfig {} => to_binary(&get_aggregator_config(deps, env)?),
+        // QueryMsg::GetAggregatorConfig {} => to_binary(&get_aggregator_config(deps, env)?),
         QueryMsg::GetAllocatedFunds {} => to_binary(&get_allocated_funds(deps, env)?),
         QueryMsg::GetAvailableFunds {} => to_binary(&get_available_funds(deps, env)?),
         QueryMsg::GetWithdrawablePayment { oracle } => {
@@ -1010,10 +1011,19 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetOracleCount {} => to_binary(&get_oracle_count(deps, env)?),
         QueryMsg::GetOracles {} => to_binary(&get_oracles(deps, env)?),
         QueryMsg::GetAdmin { oracle } => to_binary(&get_admin(deps, env, oracle)?),
-        QueryMsg::GetRoundData { round_id } => to_binary(&get_round_data(deps, env, round_id)?),
-        QueryMsg::GetLatestRoundData {} => to_binary(&get_latest_round_data(deps, env)?),
+        // QueryMsg::GetRoundData { round_id } => to_binary(&get_round_data(deps, env, round_id)?),
+        // QueryMsg::GetLatestRoundData {} => to_binary(&get_latest_round_data(deps, env)?),
         QueryMsg::GetOracleStatus { oracle } => to_binary(&get_oracle_status(deps, env, oracle)?),
         QueryMsg::GetOwner {} => to_binary(&get_owner(deps)?),
+        QueryMsg::AggregatorQuery(GetRoundData { round_id }) => {
+            to_binary(&get_round_data(deps, env, round_id)?)
+        }
+        QueryMsg::AggregatorQuery(GetLatestRoundData {}) => {
+            to_binary(&get_latest_round_data(deps, env)?)
+        }
+        QueryMsg::AggregatorQuery(GetAggregatorConfig {}) => {
+            to_binary(&get_aggregator_config(deps, env)?)
+        }
     }
 }
 

@@ -25,6 +25,7 @@ link-token = { path = "../link-token", default-features = false }
 owned = { path = "../owned", default-features = false, features = ["library"] }
 deviation-flagging-validator = { path = "../deviation-flagging-validator", default-features = false }
 utils = { path = "../utils" }
+chainlink-aggregator = { path = "../../packages/chainlink-aggregator" }
 
 [dev-dependencies]
 cosmwasm-schema = { version = "0.15.0" }

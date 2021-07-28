@@ -16,20 +16,7 @@
       "additionalProperties": false
     },
     {
-      "description": "Returns the settings of the flux aggregator Response: [`ConfigResponse`]",
-      "type": "object",
-      "required": [
-        "get_aggregator_config"
-      ],
-      "properties": {
-        "get_aggregator_config": {
-          "type": "object"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "description": "Get the amount of payment yet to be withdrawn by oracles. Response: [`Uint128`].",
+      "description": "Returns the settings of the flux aggregator Response: [`ConfigResponse`] Get the amount of payment yet to be withdrawn by oracles. Response: [`Uint128`].",
       "type": "object",
       "required": [
         "get_allocated_funds"
@@ -125,44 +112,7 @@
       "additionalProperties": false
     },
     {
-      "description": "Query data for a specific round Response: [`RoundDataResponse`].",
-      "type": "object",
-      "required": [
-        "get_round_data"
-      ],
-      "properties": {
-        "get_round_data": {
-          "type": "object",
-          "required": [
-            "round_id"
-          ],
-          "properties": {
-            "round_id": {
-              "description": "The round ID to retrieve the round data for",
-              "type": "integer",
-              "format": "uint32",
-              "minimum": 0.0
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "description": "Query data for the latest round Response: [`RoundDataResponse`].",
-      "type": "object",
-      "required": [
-        "get_latest_round_data"
-      ],
-      "properties": {
-        "get_latest_round_data": {
-          "type": "object"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "description": "Get status of specific oracle Response: [`OracleStatus`].",
+      "description": "Query data for a specific round Response: [`RoundDataResponse`]. Query data for the latest round Response: [`RoundDataResponse`]. Get status of specific oracle Response: [`OracleStatus`].",
       "type": "object",
       "required": [
         "get_oracle_status"
@@ -182,6 +132,70 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "aggregator_query"
+      ],
+      "properties": {
+        "aggregator_query": {
+          "$ref": "#/definitions/QueryMsg"
+        }
+      },
+      "additionalProperties": false
     }
-  ]
+  ],
+  "definitions": {
+    "QueryMsg": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": [
+            "get_round_data"
+          ],
+          "properties": {
+            "get_round_data": {
+              "type": "object",
+              "required": [
+                "round_id"
+              ],
+              "properties": {
+                "round_id": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "get_latest_round_data"
+          ],
+          "properties": {
+            "get_latest_round_data": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "get_aggregator_config"
+          ],
+          "properties": {
+            "get_aggregator_config": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
 }
