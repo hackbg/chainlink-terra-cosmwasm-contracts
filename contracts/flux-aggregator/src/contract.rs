@@ -335,7 +335,7 @@ fn validate_oracle_round(
 
 fn is_supersedable(storage: &dyn Storage, round_id: u32, timestamp: u64) -> StdResult<bool> {
     let round = ROUNDS.load(storage, round_id.into())?;
-    Ok(round.updated_at.unwrap() > 0 || timed_out(storage, round_id, timestamp)?)
+    Ok(round.updated_at.is_some() || timed_out(storage, round_id, timestamp)?)
 }
 
 fn timed_out(storage: &dyn Storage, round_id: u32, timestamp: u64) -> StdResult<bool> {
