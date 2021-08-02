@@ -15,13 +15,13 @@ backtraces = ["cosmwasm-std/backtraces"]
 
 [dependencies]
 cosmwasm-std = { version = "0.15.0" }
-cosmwasm-storage = { version = "0.15.0" }
+cosmwasm-storage = { version = "0.15.0", features = ["iterator"] }
 cw-storage-plus = { version = "0.7.0", features = ["iterator"] }
 schemars = "0.8.3"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.24" }
 owned = { path = "../owned", default-features = false, features = ["library"] }
-flux-aggregator = { path = "../flux-aggregator", default-features = false }
+chainlink-aggregator = { path = "../../packages/chainlink-aggregator" }
 
 [dev-dependencies]
 cosmwasm-schema = { version = "0.15.0" }
