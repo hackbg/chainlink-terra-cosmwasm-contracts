@@ -955,7 +955,7 @@ pub fn execute_set_validator(
 }
 
 pub fn execute_receive(
-    _deps: DepsMut,
+    deps: DepsMut,
     env: Env,
     _info: MessageInfo,
     receive_msg: Cw20ReceiveMsg,
@@ -963,18 +963,29 @@ pub fn execute_receive(
     if !receive_msg.msg.is_empty() {
         return Err(ContractError::UnexpectedReceivePayload {});
     }
-    let msg = WasmMsg::Execute {
-        contract_addr: env.contract.address.to_string(),
-        msg: to_binary(&ExecuteMsg::UpdateAvailableFunds {})?,
-        funds: vec![],
-    };
 
-    Ok(Response {
-        messages: vec![SubMsg::new(msg)],
-        events: vec![],
-        attributes: vec![],
-        data: None,
-    })
+    let link_addr = CONFIG.load(deps.storage)?.link;
+    let BalanceResponse { balance } = deps.querier.query_wasm_smart(
+        link_addr,
+        &LinkQuery::Balance {
+            address: env.contract.address.to_string(),
+        },
+    )?;
+
+    let new_balance = balance + receive_msg.amount;
+
+    match update_available_funds(deps, new_balance)? {
+        Some(now_available) => Ok(Response {
+            messages: vec![],
+            events: vec![],
+            attributes: vec![
+                attr("action", "update_available_funds"),
+                attr("amount", now_available),
+            ],
+            data: None,
+        }),
+        None => Ok(Response::default()),
+    }
 }
 
 pub fn execute_accept_ownership(
