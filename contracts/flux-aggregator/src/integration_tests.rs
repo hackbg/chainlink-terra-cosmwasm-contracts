@@ -3,7 +3,7 @@
 use cosmwasm_std::{
     attr, from_binary,
     testing::{mock_env, MockApi, MockStorage},
-    Addr, Attribute, Empty, Uint128,
+    Addr, Attribute, Binary, Empty, Uint128,
 };
 use cw20::BalanceResponse;
 use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
@@ -112,19 +112,11 @@ fn default_init() -> (App, Addr, Addr, Addr) {
         .execute_contract(
             owner.clone(),
             link_addr.clone(),
-            &link_token::msg::ExecuteMsg::Transfer {
-                recipient: contract.to_string(),
+            &link_token::msg::ExecuteMsg::Send {
+                contract: contract.to_string(),
                 amount: DEPOSIT,
+                msg: Binary::from(b""),
             },
-            &[],
-        )
-        .unwrap();
-
-    router
-        .execute_contract(
-            owner.clone(),
-            contract.clone(),
-            &ExecuteMsg::UpdateAvailableFunds {},
             &[],
         )
         .unwrap();
