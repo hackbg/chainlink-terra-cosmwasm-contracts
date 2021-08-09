@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, OverflowError,
+    attr, to_binary, Addr, Binary, Deps, DepsMut, Empty, Env, Event, MessageInfo, OverflowError,
     OverflowOperation, Response, StdError, StdResult, Storage, SubMsg, Timestamp, Uint128, WasmMsg,
 };
 use cw20::{BalanceResponse, Cw20ReceiveMsg};
@@ -164,8 +164,7 @@ pub fn execute_submit(
     if submission > max_submission_value {
         return Err(ContractError::OverMax {});
     }
-    let mut messages = vec![];
-    let mut attributes = vec![];
+    let mut response = Response::<Empty>::new();
     let timestamp = timestamp_to_seconds(env.block.time);
 
     let mut oracle = ORACLES.load(deps.storage, &info.sender)?;
@@ -212,12 +211,12 @@ pub fn execute_submit(
         };
         round.started_at = Some(timestamp);
         ROUNDS.save(deps.storage, round_id.into(), &round)?;
-        attributes.extend_from_slice(&[
-            attr("action", "new_round"),
-            attr("round_id", round_id),
-            attr("started_by", &info.sender),
-            attr("started_at", timestamp),
-        ]);
+        response.add_event(
+            Event::new("new_round")
+                .attr("round_id", round_id.to_string())
+                .attr("started_by", info.sender.to_string())
+                .attr("started_at", timestamp.to_string()),
+        );
 
         oracle.last_started_round = Some(round_id);
     } else {
@@ -251,11 +250,11 @@ pub fn execute_submit(
             },
         )?;
         LATEST_ROUND_ID.save(deps.storage, &round_id)?;
-        attributes.extend_from_slice(&[
-            attr("action", "answer_updated"),
-            attr("current", Uint128::new(new_answer)),
-            attr("round_id", round_id),
-        ]);
+        response.add_event(
+            Event::new("answer_updated")
+                .attr("current", Uint128::new(new_answer))
+                .attr("round_id", round_id.to_string()),
+        );
 
         let previous_round_id = prev_round_id(round_id)?;
         let prev_round = ROUNDS.load(deps.storage, previous_round_id.into())?;
@@ -271,7 +270,7 @@ pub fn execute_submit(
             funds: vec![],
         };
 
-        messages.push(SubMsg::new(validator_msg));
+        response.add_message(validator_msg);
     }
     // pay oracle
     let payment = round_details.payment_amount;
@@ -288,16 +287,17 @@ pub fn execute_submit(
     // save or delete round details
     if (round_details.submissions.len() as u32) < round_details.max_submissions {
         DETAILS.save(deps.storage, round_id.into(), &round_details)?;
+        response.add_event(
+            Event::new("submission_received")
+                .attr("submission", submission)
+                .attr("round_id", round_id.to_string())
+                .attr("oracle", info.sender.to_string()),
+        )
     } else {
         DETAILS.remove(deps.storage, round_id.into());
     }
 
-    Ok(Response {
-        messages,
-        events: vec![],
-        attributes,
-        data: None,
-    })
+    Ok(response)
 }
 
 fn validate_oracle_round(
@@ -662,13 +662,11 @@ pub fn execute_request_new_round(
     let round_id_serialized = to_binary(&new_round_id)?;
     Ok(Response {
         messages: vec![],
-        events: vec![],
-        attributes: vec![
-            attr("action", "new_round"),
-            attr("round_id", new_round_id),
-            attr("started_by", &info.sender),
-            attr("started_at", timestamp),
-        ],
+        events: vec![Event::new("new_round")
+            .attr("round_id", new_round_id.to_string())
+            .attr("started_by", &info.sender)
+            .attr("started_at", timestamp.to_string())],
+        attributes: vec![],
         data: Some(round_id_serialized),
     })
 }
