@@ -14,14 +14,14 @@ use cosmwasm_std::{
 };
 use cw20::{AllowanceResponse, BalanceResponse, TokenInfoResponse};
 use cw20_base::ContractError;
-use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
+use cw_multi_test::{App, BankKeeper, Contract, ContractWrapper, Executor};
 
 fn mock_app() -> App {
     let env = mock_env();
-    let api = Box::new(MockApi::default());
-    let bank = SimpleBank {};
+    let api = MockApi::default();
+    let bank = BankKeeper::new();
 
-    App::new(api, env.block, bank, || Box::new(MockStorage::new()))
+    App::new(api, env.block, bank, MockStorage::new())
 }
 
 pub fn contract_link_token() -> Box<dyn Contract<Empty>> {
@@ -35,7 +35,7 @@ fn test_successful_init() {
     let id = router.store_code(contract_link_token());
     let sender = Addr::unchecked("owner");
     let contract = router
-        .instantiate_contract(id, sender.clone(), &InstantiateMsg {}, &[], "LINK")
+        .instantiate_contract(id, sender.clone(), &InstantiateMsg {}, &[], "LINK", None)
         .unwrap();
 
     let expected_state = TokenInfoResponse {
@@ -59,7 +59,7 @@ fn test_transfer_success() {
     let id = router.store_code(contract_link_token());
     let owner = Addr::unchecked("owner");
     let contract = router
-        .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK")
+        .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK", None)
         .unwrap();
     let recipient_addr = MOCK_CONTRACT_ADDR;
 
@@ -86,7 +86,7 @@ fn test_transfer_underflow() {
     let id = router.store_code(contract_link_token());
     let owner = Addr::unchecked("owner");
     let contract = router
-        .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK")
+        .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK", None)
         .unwrap();
 
     let balance = Uint128::new(TOTAL_SUPPLY);
@@ -118,7 +118,7 @@ fn test_queries() {
     let id = router.store_code(contract_link_token());
     let owner = Addr::unchecked("owner");
     let contract = router
-        .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK")
+        .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK", None)
         .unwrap();
 
     let balance_res: BalanceResponse = router
@@ -164,7 +164,7 @@ fn test_modify_allowance() {
     let id = router.store_code(contract_link_token());
     let owner = Addr::unchecked("owner");
     let contract = router
-        .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK")
+        .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK", None)
         .unwrap();
 
     let spender_addr = "spender";
@@ -216,7 +216,7 @@ fn test_transfer_from() {
     let id = router.store_code(contract_link_token());
     let owner = Addr::unchecked("owner");
     let contract = router
-        .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK")
+        .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK", None)
         .unwrap();
 
     let spender = Addr::unchecked("spender");
@@ -282,7 +282,7 @@ fn test_transfer_from_without_allowance() {
     let id = router.store_code(contract_link_token());
     let owner = Addr::unchecked("owner");
     let contract = router
-        .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK")
+        .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK", None)
         .unwrap();
 
     let recipient = "recipient";
@@ -313,7 +313,7 @@ fn test_change_allowance_self() {
     let id = router.store_code(contract_link_token());
     let owner = Addr::unchecked("owner");
     let contract = router
-        .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK")
+        .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK", None)
         .unwrap();
 
     let msg = ExecuteMsg::IncreaseAllowance {
@@ -334,7 +334,7 @@ fn test_send() {
     let id = router.store_code(contract_link_token());
     let owner = Addr::unchecked("owner");
     let contract = router
-        .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK")
+        .instantiate_contract(id, owner.clone(), &InstantiateMsg {}, &[], "LINK", None)
         .unwrap();
 
     let id = router.store_code(contract_receiver_mock());
@@ -346,6 +346,7 @@ fn test_send() {
             &MockInstantiateMsg {},
             &[],
             "LINK",
+            None,
         )
         .unwrap();
 

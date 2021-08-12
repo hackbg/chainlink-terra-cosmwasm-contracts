@@ -55,12 +55,7 @@ pub fn execute_transfer_ownership(
 
     let attributes = transfer_ownership(deps, env, to)?;
 
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes,
-        data: None,
-    })
+    Ok(Response::new().add_attributes(attributes))
 }
 
 fn transfer_ownership(deps: DepsMut, _env: Env, to: Addr) -> Result<Vec<Attribute>, ContractError> {
@@ -90,12 +85,7 @@ pub fn execute_accept_ownership(
 
     let logs = accept_ownership(deps, env, info)?;
 
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes: logs,
-        data: None,
-    })
+    Ok(Response::new().add_attributes(logs))
 }
 
 fn accept_ownership(deps: DepsMut, _env: Env, info: MessageInfo) -> StdResult<Vec<Attribute>> {

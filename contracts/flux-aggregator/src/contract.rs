@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, to_binary, Addr, Binary, Deps, DepsMut, Empty, Env, Event, MessageInfo, OverflowError,
-    OverflowOperation, Response, StdError, StdResult, Storage, SubMsg, Timestamp, Uint128, WasmMsg,
+    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, Event, MessageInfo, OverflowError,
+    OverflowOperation, Response, StdError, StdResult, Storage, Timestamp, Uint128, WasmMsg,
 };
 use cw20::{BalanceResponse, Cw20ReceiveMsg};
 use deviation_flagging_validator::msg::ExecuteMsg as ValidatorMsg;
@@ -164,7 +164,7 @@ pub fn execute_submit(
     if submission > max_submission_value {
         return Err(ContractError::OverMax {});
     }
-    let mut response = Response::<Empty>::new();
+    let mut response = Response::new();
     let timestamp = timestamp_to_seconds(env.block.time);
 
     let mut oracle = ORACLES.load(deps.storage, &info.sender)?;
@@ -211,11 +211,11 @@ pub fn execute_submit(
         };
         round.started_at = Some(timestamp);
         ROUNDS.save(deps.storage, round_id.into(), &round)?;
-        response.add_event(
+        response = response.add_event(
             Event::new("new_round")
-                .attr("round_id", round_id.to_string())
-                .attr("started_by", info.sender.to_string())
-                .attr("started_at", timestamp.to_string()),
+                .add_attribute("round_id", round_id.to_string())
+                .add_attribute("started_by", info.sender.to_string())
+                .add_attribute("started_at", timestamp.to_string()),
         );
 
         oracle.last_started_round = Some(round_id);
@@ -250,10 +250,10 @@ pub fn execute_submit(
             },
         )?;
         LATEST_ROUND_ID.save(deps.storage, &round_id)?;
-        response.add_event(
+        response = response.add_event(
             Event::new("answer_updated")
-                .attr("current", Uint128::new(new_answer))
-                .attr("round_id", round_id.to_string()),
+                .add_attribute("current", Uint128::new(new_answer))
+                .add_attribute("round_id", round_id.to_string()),
         );
 
         let previous_round_id = prev_round_id(round_id)?;
@@ -270,7 +270,7 @@ pub fn execute_submit(
             funds: vec![],
         };
 
-        response.add_message(validator_msg);
+        response = response.add_message(validator_msg);
     }
     // pay oracle
     let payment = round_details.payment_amount;
@@ -287,12 +287,12 @@ pub fn execute_submit(
     // save or delete round details
     if (round_details.submissions.len() as u32) < round_details.max_submissions {
         DETAILS.save(deps.storage, round_id.into(), &round_details)?;
-        response.add_event(
+        response = response.add_event(
             Event::new("submission_received")
-                .attr("submission", submission)
-                .attr("round_id", round_id.to_string())
-                .attr("oracle", info.sender.to_string()),
-        )
+                .add_attribute("submission", submission)
+                .add_attribute("round_id", round_id.to_string())
+                .add_attribute("oracle", info.sender.to_string()),
+        );
     } else {
         DETAILS.remove(deps.storage, round_id.into());
     }
@@ -427,7 +427,7 @@ pub fn execute_change_oracles(
 ) -> Result<Response, ContractError> {
     validate_ownership(deps.as_ref(), &info)?;
 
-    let mut attributes = vec![];
+    let mut response = Response::new();
 
     for oracle in removed.iter() {
         let oracle = deps.api.addr_validate(oracle)?;
@@ -468,18 +468,12 @@ pub fn execute_change_oracles(
     // TODO uncomment if needed
     // attributes.extend_from_slice(&res.attributes);
 
-    attributes.extend_from_slice(&[
-        attr("action", "oracle_permissions_updated"),
-        attr("added", format!("{:?}", &added)),
-        attr("removed", format!("{:?}", &removed)),
-    ]);
+    response = response
+        .add_attribute("action", "oracle_permissions_updated")
+        .add_attribute("added", format!("{:?}", &added))
+        .add_attribute("removed", format!("{:?}", &removed));
 
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes, // TODO: add more logs
-        data: None,
-    })
+    Ok(response)
 }
 
 fn remove_oracle(storage: &mut dyn Storage, oracle: Addr) -> Result<(), ContractError> {
@@ -575,17 +569,11 @@ pub fn execute_transfer_admin(
         Ok(status)
     })?;
 
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes: vec![
-            attr("action", "transfer_admin"),
-            attr("oracle", oracle),
-            attr("sender", info.sender),
-            attr("new_admin", new_admin),
-        ],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_attribute("action", "transfer_admin")
+        .add_attribute("oracle", oracle)
+        .add_attribute("sender", info.sender)
+        .add_attribute("new_admin", new_admin))
 }
 
 pub fn execute_accept_admin(
@@ -611,15 +599,9 @@ pub fn execute_accept_admin(
         }
     })?;
 
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes: vec![
-            attr("oracle_admin_updated", oracle),
-            attr("new_admin", info.sender),
-        ],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_attribute("oracle_admin_updated", oracle)
+        .add_attribute("new_admin", info.sender))
 }
 
 pub fn execute_request_new_round(
@@ -660,15 +642,14 @@ pub fn execute_request_new_round(
     )?;
 
     let round_id_serialized = to_binary(&new_round_id)?;
-    Ok(Response {
-        messages: vec![],
-        events: vec![Event::new("new_round")
-            .attr("round_id", new_round_id.to_string())
-            .attr("started_by", &info.sender)
-            .attr("started_at", timestamp.to_string())],
-        attributes: vec![],
-        data: Some(round_id_serialized),
-    })
+    Ok(Response::new()
+        .add_event(
+            Event::new("new_round")
+                .add_attribute("round_id", new_round_id.to_string())
+                .add_attribute("started_by", &info.sender)
+                .add_attribute("started_at", timestamp.to_string()),
+        )
+        .set_data(round_id_serialized))
 }
 
 pub fn execute_withdraw_payment(
@@ -713,12 +694,7 @@ pub fn execute_withdraw_payment(
         funds: vec![],
     };
 
-    Ok(Response {
-        messages: vec![SubMsg::new(transfer_msg)],
-        events: vec![],
-        attributes: vec![],
-        data: None,
-    })
+    Ok(Response::new().add_message(transfer_msg))
 }
 
 pub fn execute_withdraw_funds(
@@ -758,12 +734,9 @@ pub fn execute_withdraw_funds(
         funds: vec![],
     };
 
-    Ok(Response {
-        messages: vec![SubMsg::new(transfer_msg)],
-        events: vec![],
-        attributes,
-        data: None,
-    })
+    Ok(Response::new()
+        .add_message(transfer_msg)
+        .add_attributes(attributes))
 }
 
 pub fn execute_update_available_funds(
@@ -780,15 +753,9 @@ pub fn execute_update_available_funds(
     )?;
 
     match update_available_funds(deps, prev_available.balance)? {
-        Some(now_available) => Ok(Response {
-            messages: vec![],
-            events: vec![],
-            attributes: vec![
-                attr("action", "update_available_funds"),
-                attr("amount", now_available),
-            ],
-            data: None,
-        }),
+        Some(now_available) => Ok(Response::new()
+            .add_attribute("action", "update_available_funds")
+            .add_attribute("amount", now_available)),
         None => Ok(Response::default()),
     }
 }
@@ -848,17 +815,11 @@ pub fn execute_set_requester_permissions(
         REQUESTERS.remove(deps.storage, &requester_addr);
     }
 
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes: vec![
-            attr("action", "set_requester_permission"),
-            attr("requester", requester),
-            attr("authorized", authorized),
-            attr("delay", delay),
-        ],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_attribute("action", "set_requester_permission")
+        .add_attribute("requester", requester)
+        .add_attribute("authorized", authorized.to_string())
+        .add_attribute("delay", delay.to_string()))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -904,19 +865,13 @@ pub fn execute_update_future_rounds(
         })
     })?;
 
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes: vec![
-            attr("action", "round_details_updated"),
-            attr("payment_amount", payment_amount),
-            attr("min_submissions", min_submissions),
-            attr("max_submissions", max_submissions),
-            attr("restart_delay", restart_delay),
-            attr("timeout", timeout),
-        ],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_attribute("action", "round_details_updated")
+        .add_attribute("payment_amount", payment_amount)
+        .add_attribute("min_submissions", min_submissions.to_string())
+        .add_attribute("max_submissions", max_submissions.to_string())
+        .add_attribute("restart_delay", restart_delay.to_string())
+        .add_attribute("timeout", timeout.to_string()))
 }
 
 pub fn execute_set_validator(
@@ -940,16 +895,10 @@ pub fn execute_set_validator(
         })
     })?;
 
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes: vec![
-            attr("action", "validator_updated"),
-            attr("previous", old_validator.to_string()),
-            attr("new", validator),
-        ],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_attribute("action", "validator_updated")
+        .add_attribute("previous", old_validator.to_string())
+        .add_attribute("new", validator))
 }
 
 pub fn execute_receive(
@@ -973,15 +922,9 @@ pub fn execute_receive(
     let new_balance = balance + receive_msg.amount;
 
     match update_available_funds(deps, new_balance)? {
-        Some(now_available) => Ok(Response {
-            messages: vec![],
-            events: vec![],
-            attributes: vec![
-                attr("action", "update_available_funds"),
-                attr("amount", now_available),
-            ],
-            data: None,
-        }),
+        Some(now_available) => Ok(Response::new()
+            .add_attribute("action", "update_available_funds")
+            .add_attribute("amount", now_available)),
         None => Ok(Response::default()),
     }
 }

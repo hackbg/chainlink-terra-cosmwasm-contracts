@@ -1,4 +1,4 @@
-use cosmwasm_std::{attr, from_binary, to_binary, Binary, Empty, Response, StdResult};
+use cosmwasm_std::{from_binary, to_binary, Binary, Empty, Response, StdResult};
 use cw20::Cw20ReceiveMsg;
 use cw_multi_test::{Contract, ContractWrapper};
 use schemars::JsonSchema;
@@ -34,12 +34,9 @@ pub fn contract_receiver_mock() -> Box<dyn Contract<Empty>> {
                     msg,
                 }) => {
                     let received: PingMsg = from_binary(&msg)?;
-                    Ok(Response {
-                        events: vec![],
-                        messages: vec![],
-                        attributes: vec![attr("action", "pong")],
-                        data: Some(to_binary(&received.payload)?),
-                    })
+                    Ok(Response::new()
+                        .add_attribute("action", "pong")
+                        .set_data(to_binary(&received.payload)?))
                 }
             }
         },

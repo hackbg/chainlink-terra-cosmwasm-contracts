@@ -6,7 +6,7 @@ use cosmwasm_std::{
     Addr, Attribute, Binary, Empty, Uint128,
 };
 use cw20::BalanceResponse;
-use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
+use cw_multi_test::{App, BankKeeper, Contract, ContractWrapper, Executor};
 
 use crate::{
     contract::{execute, instantiate, query},
@@ -29,10 +29,11 @@ static ANSWER: Uint128 = Uint128::new(100);
 
 fn mock_app() -> App {
     let env = mock_env();
-    let api = Box::new(MockApi::default());
-    let bank = SimpleBank {};
+    let api = MockApi::default();
+    let bank = BankKeeper::new();
+    let storage = MockStorage::new();
 
-    App::new(api, env.block, bank, || Box::new(MockStorage::new()))
+    App::new(api, env.block, bank, storage)
 }
 
 pub fn contract_flux_aggregator() -> Box<dyn Contract<Empty>> {
@@ -70,6 +71,7 @@ fn default_init() -> (App, Addr, Addr, Addr) {
             &link_token::msg::InstantiateMsg {},
             &[],
             "LINK",
+            None,
         )
         .unwrap();
 
@@ -84,6 +86,7 @@ fn default_init() -> (App, Addr, Addr, Addr) {
             },
             &[],
             "Deviation Flagging Validator",
+            None,
         )
         .unwrap();
 
@@ -104,6 +107,7 @@ fn default_init() -> (App, Addr, Addr, Addr) {
             },
             &[],
             "Flux aggregator",
+            None,
         )
         .unwrap();
 
