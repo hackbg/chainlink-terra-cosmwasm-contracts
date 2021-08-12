@@ -919,9 +919,7 @@ pub fn execute_receive(
         },
     )?;
 
-    let new_balance = balance + receive_msg.amount;
-
-    match update_available_funds(deps, new_balance)? {
+    match update_available_funds(deps, balance)? {
         Some(now_available) => Ok(Response::new()
             .add_attribute("action", "update_available_funds")
             .add_attribute("amount", now_available)),
