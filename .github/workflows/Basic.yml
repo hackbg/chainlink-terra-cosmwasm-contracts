@@ -20,11 +20,11 @@ jobs:
           target: wasm32-unknown-unknown
           override: true
 
-      - name: Run unit tests
+      - name: Run tests
         uses: actions-rs/cargo@v1
         with:
-          command: unit-test
-          args: --locked
+          command: test
+          args: --lib --locked
         env:
           RUST_BACKTRACE: 1
 
@@ -35,14 +35,6 @@ jobs:
           args: --all --locked
         env:
           RUSTFLAGS: "-C link-arg=-s"
-
-      - name: Run integration tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: integration-test
-          args: --all --locked
-        env:
-          RUST_BACKTRACE: 1
 
   lints:
     name: Lints
