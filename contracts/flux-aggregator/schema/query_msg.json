@@ -150,6 +150,7 @@
     "QueryMsg": {
       "anyOf": [
         {
+          "description": "Query data for a specific round Response: [`RoundDataResponse`].",
           "type": "object",
           "required": [
             "get_round_data"
@@ -162,6 +163,7 @@
               ],
               "properties": {
                 "round_id": {
+                  "description": "The round ID to retrieve the round data for",
                   "type": "integer",
                   "format": "uint32",
                   "minimum": 0.0
@@ -172,6 +174,7 @@
           "additionalProperties": false
         },
         {
+          "description": "Query data for the latest round Response: [`RoundDataResponse`].",
           "type": "object",
           "required": [
             "get_latest_round_data"
@@ -184,6 +187,7 @@
           "additionalProperties": false
         },
         {
+          "description": "Returns the settings of the flux aggregator Response: [`ConfigResponse`]",
           "type": "object",
           "required": [
             "get_aggregator_config"

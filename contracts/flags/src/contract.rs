@@ -56,23 +56,16 @@ pub fn execute_raise_flag(
 ) -> Result<Response, ContractError> {
     check_access(deps.as_ref())?;
     if FLAGS.may_load(deps.as_ref().storage, &subject)? == Some(true) {
-        Ok(Response {
-            messages: vec![],
-            events: vec![],
-            attributes: vec![
-                attr("action", "already raised flag"),
-                attr("subject", subject),
-            ],
-            data: None,
-        })
+        Ok(Response::new().add_attributes(vec![
+            attr("action", "already raised flag"),
+            attr("subject", subject),
+        ]))
     } else {
         FLAGS.save(deps.storage, &subject, &true)?;
-        Ok(Response {
-            messages: vec![],
-            events: vec![],
-            attributes: vec![attr("action", "raised flag"), attr("subject", subject)],
-            data: None,
-        })
+        Ok(Response::new().add_attributes(vec![
+            attr("action", "raised flag"),
+            attr("subject", subject),
+        ]))
     }
 }
 
@@ -96,12 +89,7 @@ pub fn execute_raise_flags(
                 .extend_from_slice(&[attr("action", "flag raised"), attr("subject", subject)]);
         }
     }
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes,
-        data: None,
-    })
+    Ok(Response::new().add_attributes(attributes))
 }
 
 pub fn execute_lower_flags(
@@ -119,12 +107,7 @@ pub fn execute_lower_flags(
                 .extend_from_slice(&[attr("action", "flag lowered"), attr("address", subject)]);
         }
     }
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes,
-        data: None,
-    })
+    Ok(Response::new().add_attributes(attributes))
 }
 
 pub fn execute_set_raising_access_controller(
@@ -138,16 +121,11 @@ pub fn execute_set_raising_access_controller(
     config(deps.storage).save(&State {
         raising_access_controller: rac_address.clone(),
     })?;
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes: vec![
-            attr("action", "raising access controller updated"),
-            attr("address", rac_address),
-            attr("previous", prev_rac),
-        ],
-        data: None,
-    })
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "raising access controller updated"),
+        attr("address", rac_address),
+        attr("previous", prev_rac),
+    ]))
 }
 
 pub fn get_flag(deps: Deps, subject: Addr) -> Result<bool, ContractError> {

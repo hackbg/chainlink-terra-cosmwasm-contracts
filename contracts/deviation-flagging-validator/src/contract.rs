@@ -1,7 +1,5 @@
-use cosmwasm_std::SubMsg;
 use cosmwasm_std::{
-    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
-    WasmMsg,
+    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, WasmMsg,
 };
 
 use crate::error::ContractError;
@@ -98,19 +96,16 @@ pub fn execute_validate(
             })?,
             funds: vec![],
         };
-        Ok(Response {
-            messages: vec![SubMsg::new(raise_flag_msg)],
-            events: vec![],
-            attributes: vec![attr("action", "validate"), attr("is valid", false)],
-            data: Some(to_binary(&false)?),
-        })
+        Ok(Response::new()
+            .add_message(raise_flag_msg)
+            .add_attribute("action", "validate")
+            .add_attribute("is_valid", false.to_string())
+            .set_data(to_binary(&false)?))
     } else {
-        Ok(Response {
-            messages: vec![],
-            events: vec![],
-            attributes: vec![attr("action", "validate"), attr("is valid", true)],
-            data: Some(to_binary(&true)?),
-        })
+        Ok(Response::new()
+            .add_attribute("action", "validate")
+            .add_attribute("is_valid", true.to_string())
+            .set_data(to_binary(&true)?))
     }
 }
 
@@ -129,16 +124,9 @@ pub fn execute_set_flags_address(
         })?;
     }
 
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes: vec![
-            attr("action", "flags address updated"),
-            attr("previous", previous),
-            attr("current", flags),
-        ],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_attribute("action", "flags_address_updated")
+        .add_attribute("previous", previous))
 }
 
 pub fn execute_set_flagging_threshold(
@@ -157,16 +145,10 @@ pub fn execute_set_flagging_threshold(
         })?;
     }
 
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes: vec![
-            attr("action", "flagging threshold updated"),
-            attr("previous", previous_ft),
-            attr("current", threshold),
-        ],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_attribute("action", "flagging_threshold_updated")
+        .add_attribute("previous", previous_ft.to_string())
+        .add_attribute("current", threshold.to_string()))
 }
 
 pub fn execute_transfer_ownership(
@@ -215,7 +197,7 @@ fn validate_ownership(deps: Deps, _env: &Env, info: MessageInfo) -> Result<(), C
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Api};
+    use cosmwasm_std::{attr, coins, Api};
 
     #[test]
     fn proper_initialization() {
@@ -331,7 +313,10 @@ mod tests {
         // the case if validate is true
         let res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
         assert_eq!(
-            vec![attr("action", "validate"), attr("is valid", true)],
+            vec![
+                attr("action", "validate"),
+                attr("is_valid", true.to_string())
+            ],
             res.attributes
         );
 
@@ -343,7 +328,10 @@ mod tests {
         };
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(
-            vec![attr("action", "validate"), attr("is valid", false)],
+            vec![
+                attr("action", "validate"),
+                attr("is_valid", false.to_string())
+            ],
             res.attributes
         );
     }

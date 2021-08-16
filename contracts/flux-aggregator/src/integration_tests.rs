@@ -1,13 +1,13 @@
 #![cfg(test)]
 
-use chainlink_aggregator::QueryMsg as AggregatorQuery;
+use chainlink_aggregator::QueryMsg::*;
 use cosmwasm_std::{
     attr, from_binary,
     testing::{mock_env, MockApi, MockStorage},
-    Addr, Attribute, Empty, Uint128,
+    Addr, Attribute, Binary, Empty, Uint128,
 };
 use cw20::BalanceResponse;
-use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
+use cw_multi_test::{App, BankKeeper, Contract, ContractWrapper, Executor};
 
 use crate::{
     contract::{execute, instantiate, query},
@@ -30,10 +30,11 @@ static ANSWER: Uint128 = Uint128::new(100);
 
 fn mock_app() -> App {
     let env = mock_env();
-    let api = Box::new(MockApi::default());
-    let bank = SimpleBank {};
+    let api = MockApi::default();
+    let bank = BankKeeper::new();
+    let storage = MockStorage::new();
 
-    App::new(api, env.block, bank, || Box::new(MockStorage::new()))
+    App::new(api, env.block, bank, storage)
 }
 
 pub fn contract_flux_aggregator() -> Box<dyn Contract<Empty>> {
@@ -71,6 +72,7 @@ fn default_init() -> (App, Addr, Addr, Addr) {
             &link_token::msg::InstantiateMsg {},
             &[],
             "LINK",
+            None,
         )
         .unwrap();
 
@@ -85,6 +87,7 @@ fn default_init() -> (App, Addr, Addr, Addr) {
             },
             &[],
             "Deviation Flagging Validator",
+            None,
         )
         .unwrap();
 
@@ -105,6 +108,7 @@ fn default_init() -> (App, Addr, Addr, Addr) {
             },
             &[],
             "Flux aggregator",
+            None,
         )
         .unwrap();
 
@@ -113,19 +117,11 @@ fn default_init() -> (App, Addr, Addr, Addr) {
         .execute_contract(
             owner.clone(),
             link_addr.clone(),
-            &link_token::msg::ExecuteMsg::Transfer {
-                recipient: contract.to_string(),
+            &link_token::msg::ExecuteMsg::Send {
+                contract: contract.to_string(),
                 amount: DEPOSIT,
+                msg: Binary::from(b""),
             },
-            &[],
-        )
-        .unwrap();
-
-    router
-        .execute_contract(
-            owner.clone(),
-            contract.clone(),
-            &ExecuteMsg::UpdateAvailableFunds {},
             &[],
         )
         .unwrap();
@@ -268,10 +264,7 @@ fn submit_unfinished_round() {
 
     let round: RoundDataResponse = router
         .wrap()
-        .query_wasm_smart(
-            contract.clone(),
-            &AggregatorQuery::GetLatestRoundData {}.wrap(),
-        )
+        .query_wasm_smart(contract.clone(), &QueryMsg::AggregatorQuery(GetLatestRoundData {}))
         .unwrap();
     assert!(round.answer.is_none());
 
@@ -288,10 +281,7 @@ fn submit_unfinished_round() {
 
     let round: RoundDataResponse = router
         .wrap()
-        .query_wasm_smart(
-            contract.clone(),
-            &AggregatorQuery::GetLatestRoundData {}.wrap(),
-        )
+        .query_wasm_smart(contract.clone(), &QueryMsg::AggregatorQuery(GetLatestRoundData {})) 
         .unwrap();
     // answer should not be updated
     assert!(round.answer.is_none());
@@ -316,10 +306,7 @@ fn submit_complete_round() {
 
     let round: RoundDataResponse = router
         .wrap()
-        .query_wasm_smart(
-            contract.clone(),
-            &AggregatorQuery::GetLatestRoundData {}.wrap(),
-        )
+        .query_wasm_smart(contract.clone(), &QueryMsg::AggregatorQuery(GetLatestRoundData {})) 
         .unwrap();
     assert!(round.answer.is_none());
 
@@ -348,10 +335,7 @@ fn submit_complete_round() {
 
     let round: RoundDataResponse = router
         .wrap()
-        .query_wasm_smart(
-            contract.clone(),
-            &AggregatorQuery::GetLatestRoundData {}.wrap(),
-        )
+        .query_wasm_smart(contract.clone(), &QueryMsg::AggregatorQuery(GetLatestRoundData {})) 
         .unwrap();
     assert!(round.updated_at.is_some());
     assert_eq!(round.answer, Some(Uint128::new(150))); // (100 + 200) / 2
@@ -617,10 +601,7 @@ fn set_validator() {
     assert_eq!(attributes.len(), 4);
     let config: ConfigResponse = router
         .wrap()
-        .query_wasm_smart(
-            contract.clone(),
-            &AggregatorQuery::GetAggregatorConfig {}.wrap(),
-        )
+        .query_wasm_smart(contract.clone(), &QueryMsg::AggregatorQuery(GetAggregatorConfig {}))
         .unwrap();
     assert_eq!(config.validator, new_validator);
     // setting the same validator twice should not have attributes
@@ -910,10 +891,7 @@ fn request_new_round_round_in_progress() {
         .unwrap();
     let res: RoundDataResponse = router
         .wrap()
-        .query_wasm_smart(
-            contract.clone(),
-            &AggregatorQuery::GetLatestRoundData {}.wrap(),
-        )
+        .query_wasm_smart(contract.clone(), &QueryMsg::AggregatorQuery(GetLatestRoundData {})) 
         .unwrap();
     assert!(res.answer.is_none());
 
