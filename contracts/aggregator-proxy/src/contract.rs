@@ -236,7 +236,10 @@ fn add_phase_ids(round_data: RoundDataResponse, phase_id: u16) -> RoundDataRespo
 }
 
 fn add_phase(phase: u16, original_id: u32) -> u32 {
-    (phase as u32) << PHASE_OFFSET.u128() | original_id
+    (phase as u32)
+        .checked_shl(PHASE_OFFSET.u128() as u32)
+        .unwrap_or(0)
+        | original_id
 }
 
 fn validate_ownership(deps: Deps, info: &MessageInfo) -> Result<(), ContractError> {
@@ -247,7 +250,313 @@ fn validate_ownership(deps: Deps, info: &MessageInfo) -> Result<(), ContractErro
     Ok(())
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cosmwasm_std::{
+        testing::{mock_env, MockApi, MockStorage},
+        Addr, Empty,
+    };
+    use cw_multi_test::{App, BankKeeper, Contract, ContractWrapper, Executor};
+
+    const OWNER: &str = "admin0001";
+
+    const PAYMENT_AMOUNT: Uint128 = Uint128::new(3);
+
+    pub fn contract_proxy() -> Box<dyn Contract<Empty>> {
+        let contract = ContractWrapper::new(
+            crate::contract::execute,
+            crate::contract::instantiate,
+            crate::contract::query,
+        );
+        Box::new(contract)
+    }
+
+    pub fn contract_flux() -> Box<dyn Contract<Empty>> {
+        let contract = ContractWrapper::new(
+            flux_aggregator::contract::execute,
+            flux_aggregator::contract::instantiate,
+            flux_aggregator::contract::query,
+        );
+        Box::new(contract)
+    }
+
+    pub fn contract_link_token() -> Box<dyn Contract<Empty>> {
+        let contract = ContractWrapper::new(
+            link_token::contract::execute,
+            link_token::contract::instantiate,
+            link_token::contract::query,
+        );
+        Box::new(contract)
+    }
+    pub fn contract_df_validator() -> Box<dyn Contract<Empty>> {
+        let contract = ContractWrapper::new(
+            deviation_flagging_validator::contract::execute,
+            deviation_flagging_validator::contract::instantiate,
+            deviation_flagging_validator::contract::query,
+        );
+        Box::new(contract)
+    }
+
+    pub fn instantiate_link(app: &mut App) -> Addr {
+        let link_id = app.store_code(contract_link_token());
+        app.instantiate_contract(
+            link_id,
+            Addr::unchecked(OWNER),
+            &link_token::msg::InstantiateMsg {},
+            &[],
+            "LINK",
+            None,
+        )
+        .unwrap()
+    }
+
+    pub fn instantiate_df_validator(app: &mut App) -> Addr {
+        let df_validator_id = app.store_code(contract_df_validator());
+        app.instantiate_contract(
+            df_validator_id,
+            Addr::unchecked(OWNER),
+            &deviation_flagging_validator::msg::InstantiateMsg {
+                flags: Addr::unchecked("flags"),
+                flagging_threshold: 100000,
+            },
+            &[],
+            "Deviation Flagging Validator",
+            None,
+        )
+        .unwrap()
+    }
+
+    pub fn instantiate_flux(
+        app: &mut App,
+        link_addr: Addr,
+        validator_addr: Addr,
+        description: &str,
+    ) -> Addr {
+        let flux_aggregator_id = app.store_code(contract_flux());
+        app.instantiate_contract(
+            flux_aggregator_id,
+            Addr::unchecked(OWNER),
+            &flux_aggregator::msg::InstantiateMsg {
+                link: link_addr.to_string(),
+                payment_amount: PAYMENT_AMOUNT,
+                timeout: 1800,
+                validator: validator_addr.to_string(),
+                min_submission_value: Uint128::new(1),
+                max_submission_value: Uint128::new(10000000),
+                decimals: 18,
+                description: description.to_string(),
+            },
+            &[],
+            "Flux aggregator",
+            None,
+        )
+        .unwrap()
+    }
+
+    pub fn instantiate_proxy(app: &mut App, aggregator: Addr) -> Addr {
+        let proxy_id = app.store_code(contract_proxy());
+        let msg = crate::msg::InstantiateMsg {
+            aggregator: aggregator.to_string(),
+        };
+        app.instantiate_contract(
+            proxy_id,
+            Addr::unchecked(OWNER),
+            &msg,
+            &[],
+            "aggregator_proxy",
+            None,
+        )
+        .unwrap()
+    }
+
+    fn mock_app() -> App {
+        let env = mock_env();
+        let api = MockApi::default();
+        let bank = BankKeeper::new();
+
+        App::new(api, env.block, bank, MockStorage::new())
+    }
+
+    #[test]
+    fn instantiate_works() {
+        let mut app = mock_app();
+        let link_addr = instantiate_link(&mut app);
+        let df_validator_addr = instantiate_df_validator(&mut app);
+        let flux_aggregator_addr =
+            instantiate_flux(&mut app, link_addr, df_validator_addr, "LINK/USD");
+        let proxy_addr = instantiate_proxy(&mut app, flux_aggregator_addr);
+
+        let phase_aggregators_query = QueryMsg::GetPhaseAggregators {};
+        let res: PhaseAggregators = app
+            .wrap()
+            .query_wasm_smart(&proxy_addr, &phase_aggregators_query)
+            .unwrap();
+
+        assert_eq!(1, res.len());
+    }
+
+    #[test]
+    fn propose_aggregator_works() {
+        let mut app = mock_app();
+
+        // first aggregator
+        let link_addr = instantiate_link(&mut app);
+        let df_validator_addr = instantiate_df_validator(&mut app);
+        let flux_aggregator_addr =
+            instantiate_flux(&mut app, link_addr, df_validator_addr, "LINK/USD");
+
+        // second aggregator
+        let link_addr = instantiate_link(&mut app);
+        let df_validator_addr = instantiate_df_validator(&mut app);
+        let flux_aggregator_addr2 =
+            instantiate_flux(&mut app, link_addr, df_validator_addr, "LUNA/USD");
+
+        let proxy_addr = instantiate_proxy(&mut app, flux_aggregator_addr);
+
+        let phase_aggregators_query = QueryMsg::GetPhaseAggregators {};
+        let res: PhaseAggregators = app
+            .wrap()
+            .query_wasm_smart(&proxy_addr, &phase_aggregators_query)
+            .unwrap();
+
+        assert_eq!(1, res.len());
+
+        let propose_aggregator_msg = ExecuteMsg::ProposeAggregator {
+            aggregator: flux_aggregator_addr2.to_string(),
+        };
+        app.execute_contract(
+            Addr::unchecked(OWNER),
+            proxy_addr.clone(),
+            &propose_aggregator_msg,
+            &[],
+        )
+        .unwrap();
+
+        let proposed_aggregator_query = QueryMsg::GetProposedAggregator {};
+        let res: Addr = app
+            .wrap()
+            .query_wasm_smart(&proxy_addr, &proposed_aggregator_query)
+            .unwrap();
+
+        assert_eq!(flux_aggregator_addr2.to_string(), res.to_string());
+    }
+
+    #[test]
+    fn confirm_aggregator_works() {
+        let mut app = mock_app();
+
+        // first aggregator
+        let link_addr = instantiate_link(&mut app);
+        let df_validator_addr = instantiate_df_validator(&mut app);
+        let flux_aggregator_addr =
+            instantiate_flux(&mut app, link_addr, df_validator_addr, "LINK/USD");
+
+        // second aggregator
+        let link_addr = instantiate_link(&mut app);
+        let df_validator_addr = instantiate_df_validator(&mut app);
+        let flux_aggregator_addr2 =
+            instantiate_flux(&mut app, link_addr, df_validator_addr, "LUNA/USD");
+
+        let proxy_addr = instantiate_proxy(&mut app, flux_aggregator_addr);
+
+        let phase_aggregators_query = QueryMsg::GetPhaseAggregators {};
+        let res: PhaseAggregators = app
+            .wrap()
+            .query_wasm_smart(&proxy_addr, &phase_aggregators_query)
+            .unwrap();
+
+        assert_eq!(1, res.len());
+
+        let propose_aggregator_msg = ExecuteMsg::ProposeAggregator {
+            aggregator: flux_aggregator_addr2.to_string(),
+        };
+        app.execute_contract(
+            Addr::unchecked(OWNER),
+            proxy_addr.clone(),
+            &propose_aggregator_msg,
+            &[],
+        )
+        .unwrap();
+
+        let proposed_aggregator_query = QueryMsg::GetProposedAggregator {};
+        let res: Addr = app
+            .wrap()
+            .query_wasm_smart(&proxy_addr, &proposed_aggregator_query)
+            .unwrap();
+
+        assert_eq!(flux_aggregator_addr2.to_string(), res.to_string());
+
+        let confirm_aggregator_msg = ExecuteMsg::ConfirmAggregator {
+            aggregator: flux_aggregator_addr2.to_string(),
+        };
+        app.execute_contract(
+            Addr::unchecked(OWNER),
+            proxy_addr.clone(),
+            &confirm_aggregator_msg,
+            &[],
+        )
+        .unwrap();
+
+        let res: PhaseAggregators = app
+            .wrap()
+            .query_wasm_smart(&proxy_addr, &phase_aggregators_query)
+            .unwrap();
+
+        assert_eq!(2, res.len());
+    }
+
+    #[test]
+    fn querying_current_phase_aggregator_works() {
+        let mut app = mock_app();
+
+        // first aggregator
+        let link_addr = instantiate_link(&mut app);
+        let df_validator_addr = instantiate_df_validator(&mut app);
+        let flux_aggregator_addr =
+            instantiate_flux(&mut app, link_addr, df_validator_addr, "LINK/USD");
+
+        // second aggregator
+        let link_addr = instantiate_link(&mut app);
+        let df_validator_addr = instantiate_df_validator(&mut app);
+        let flux_aggregator_addr2 =
+            instantiate_flux(&mut app, link_addr, df_validator_addr, "LUNA/USD");
+
+        let proxy_addr = instantiate_proxy(&mut app, flux_aggregator_addr);
+
+        let query_description = QueryMsg::GetDescription {};
+        let res: String = app
+            .wrap()
+            .query_wasm_smart(&proxy_addr, &query_description)
+            .unwrap();
+        assert_eq!("LINK/USD".to_string(), res);
+
+        let propose_aggregator_msg = ExecuteMsg::ProposeAggregator {
+            aggregator: flux_aggregator_addr2.to_string(),
+        };
+        app.execute_contract(
+            Addr::unchecked(OWNER),
+            proxy_addr.clone(),
+            &propose_aggregator_msg,
+            &[],
+        )
+        .unwrap();
+
+        let confirm_aggregator_msg = ExecuteMsg::ConfirmAggregator {
+            aggregator: flux_aggregator_addr2.to_string(),
+        };
+        app.execute_contract(
+            Addr::unchecked(OWNER),
+            proxy_addr.clone(),
+            &confirm_aggregator_msg,
+            &[],
+        )
+        .unwrap();
+
+        let res: String = app
+            .wrap()
+            .query_wasm_smart(&proxy_addr, &query_description)
+            .unwrap();
+        assert_eq!("LUNA/USD".to_string(), res);
+    }
+}

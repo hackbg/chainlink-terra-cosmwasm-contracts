@@ -22,6 +22,9 @@ serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.24" }
 owned = { path = "../owned", default-features = false, features = ["library"] }
 chainlink-aggregator = { path = "../../packages/chainlink-aggregator" }
+flux-aggregator = { path="../flux-aggregator", default-features = false}
+link-token = { path = "../link-token", default-features = false }
+deviation-flagging-validator = { path = "../deviation-flagging-validator", default-features = false }
 
 [dev-dependencies]
 cosmwasm-schema = { version = "0.16.0" }
