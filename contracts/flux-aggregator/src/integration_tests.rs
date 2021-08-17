@@ -264,7 +264,10 @@ fn submit_unfinished_round() {
 
     let round: RoundDataResponse = router
         .wrap()
-        .query_wasm_smart(contract.clone(), &QueryMsg::AggregatorQuery(GetLatestRoundData {}))
+        .query_wasm_smart(
+            contract.clone(),
+            &QueryMsg::AggregatorQuery(GetLatestRoundData {}),
+        )
         .unwrap();
     assert!(round.answer.is_none());
 
@@ -281,7 +284,10 @@ fn submit_unfinished_round() {
 
     let round: RoundDataResponse = router
         .wrap()
-        .query_wasm_smart(contract.clone(), &QueryMsg::AggregatorQuery(GetLatestRoundData {})) 
+        .query_wasm_smart(
+            contract.clone(),
+            &QueryMsg::AggregatorQuery(GetLatestRoundData {}),
+        )
         .unwrap();
     // answer should not be updated
     assert!(round.answer.is_none());
@@ -306,7 +312,10 @@ fn submit_complete_round() {
 
     let round: RoundDataResponse = router
         .wrap()
-        .query_wasm_smart(contract.clone(), &QueryMsg::AggregatorQuery(GetLatestRoundData {})) 
+        .query_wasm_smart(
+            contract.clone(),
+            &QueryMsg::AggregatorQuery(GetLatestRoundData {}),
+        )
         .unwrap();
     assert!(round.answer.is_none());
 
@@ -335,7 +344,10 @@ fn submit_complete_round() {
 
     let round: RoundDataResponse = router
         .wrap()
-        .query_wasm_smart(contract.clone(), &QueryMsg::AggregatorQuery(GetLatestRoundData {})) 
+        .query_wasm_smart(
+            contract.clone(),
+            &QueryMsg::AggregatorQuery(GetLatestRoundData {}),
+        )
         .unwrap();
     assert!(round.updated_at.is_some());
     assert_eq!(round.answer, Some(Uint128::new(150))); // (100 + 200) / 2
@@ -601,7 +613,10 @@ fn set_validator() {
     assert_eq!(attributes.len(), 4);
     let config: ConfigResponse = router
         .wrap()
-        .query_wasm_smart(contract.clone(), &QueryMsg::AggregatorQuery(GetAggregatorConfig {}))
+        .query_wasm_smart(
+            contract.clone(),
+            &QueryMsg::AggregatorQuery(GetAggregatorConfig {}),
+        )
         .unwrap();
     assert_eq!(config.validator, new_validator);
     // setting the same validator twice should not have attributes
@@ -891,7 +906,10 @@ fn request_new_round_round_in_progress() {
         .unwrap();
     let res: RoundDataResponse = router
         .wrap()
-        .query_wasm_smart(contract.clone(), &QueryMsg::AggregatorQuery(GetLatestRoundData {})) 
+        .query_wasm_smart(
+            contract.clone(),
+            &QueryMsg::AggregatorQuery(GetLatestRoundData {}),
+        )
         .unwrap();
     assert!(res.answer.is_none());
 

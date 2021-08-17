@@ -974,7 +974,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::AggregatorQuery(GetAggregatorConfig {}) => {
             to_binary(&get_aggregator_config(deps, env)?)
         }
-        
     }
 }
 
