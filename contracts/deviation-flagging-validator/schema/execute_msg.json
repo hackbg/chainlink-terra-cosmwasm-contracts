@@ -17,11 +17,7 @@
           "properties": {
             "to": {
               "description": "Address to transfer ownership to",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/Addr"
-                }
-              ]
+              "type": "string"
             }
           }
         }
