@@ -455,7 +455,7 @@ pub fn execute_change_oracles(
         ..
     } = CONFIG.load(deps.storage)?;
 
-    let _res = execute_update_future_rounds(
+    let res = execute_update_future_rounds(
         deps,
         env,
         info,
@@ -465,13 +465,18 @@ pub fn execute_change_oracles(
         restart_delay,
         timeout,
     )?;
-    // TODO uncomment if needed
-    // attributes.extend_from_slice(&res.attributes);
 
-    response = response
-        .add_attribute("action", "oracle_permissions_updated")
-        .add_attribute("added", format!("{:?}", &added))
-        .add_attribute("removed", format!("{:?}", &removed));
+    response = response.add_events(vec![
+        res.events
+            .get(0)
+            .ok_or(StdError::generic_err(
+                "No event from execute_update_available_funds",
+            ))?
+            .clone(),
+        Event::new("oracle_permissions_updated")
+            .add_attribute("added", format!("{:?}", &added))
+            .add_attribute("removed", format!("{:?}", &removed)),
+    ]);
 
     Ok(response)
 }
@@ -865,13 +870,14 @@ pub fn execute_update_future_rounds(
         })
     })?;
 
-    Ok(Response::new()
-        .add_attribute("action", "round_details_updated")
-        .add_attribute("payment_amount", payment_amount)
-        .add_attribute("min_submissions", min_submissions.to_string())
-        .add_attribute("max_submissions", max_submissions.to_string())
-        .add_attribute("restart_delay", restart_delay.to_string())
-        .add_attribute("timeout", timeout.to_string()))
+    Ok(Response::new().add_event(
+        Event::new("round_details_updated")
+            .add_attribute("payment_amount", payment_amount)
+            .add_attribute("min_submissions", min_submissions.to_string())
+            .add_attribute("max_submissions", max_submissions.to_string())
+            .add_attribute("restart_delay", restart_delay.to_string())
+            .add_attribute("timeout", timeout.to_string()),
+    ))
 }
 
 pub fn execute_set_validator(
