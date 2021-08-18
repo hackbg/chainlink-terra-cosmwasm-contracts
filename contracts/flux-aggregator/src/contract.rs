@@ -469,9 +469,7 @@ pub fn execute_change_oracles(
     response = response.add_events(vec![
         res.events
             .get(0)
-            .ok_or(StdError::generic_err(
-                "No event from execute_update_available_funds",
-            ))?
+            .ok_or_else(|| StdError::generic_err("No event from execute_update_available_funds"))?
             .clone(),
         Event::new("oracle_permissions_updated")
             .add_attribute("added", format!("{:?}", &added))
