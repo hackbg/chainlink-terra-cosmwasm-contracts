@@ -1,6 +1,8 @@
 use cosmwasm_std::{
     attr, entry_point, to_binary, Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Response,
 };
+use owned::contract::execute_accept_ownership;
+use owned::contract::execute_transfer_ownership;
 
 use crate::error::ContractError;
 use crate::msg::*;
@@ -36,6 +38,12 @@ pub fn execute(
         ExecuteMsg::SetRaisingAccessController { rac_address } => {
             execute_set_raising_access_controller(deps, env, info, rac_address)
         }
+        ExecuteMsg::TransferOwnership { to } => {
+            execute_transfer_ownership(deps, env, info, to).map_err(ContractError::from)
+        }
+        ExecuteMsg::AcceptOwnership {} => {
+            execute_accept_ownership(deps, env, info).map_err(ContractError::from)
+        }
     }
 }
 
@@ -45,6 +53,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<QueryResponse, Cont
         QueryMsg::GetFlag { subject } => Ok(to_binary(&get_flag(deps, subject)?)?),
         QueryMsg::GetFlags { subjects } => Ok(to_binary(&get_flags(deps, subjects)?)?),
         QueryMsg::GetRac {} => Ok(to_binary(&get_rac(deps)?)?),
+        QueryMsg::GetOwner {} => Ok(to_binary(&get_owner(deps)?)?),
     }
 }
 
@@ -52,27 +61,21 @@ pub fn execute_raise_flag(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    subject: Addr,
+    subject: String,
 ) -> Result<Response, ContractError> {
     check_access(deps.as_ref())?;
+    let subject = deps.api.addr_validate(&subject)?;
     if FLAGS.may_load(deps.as_ref().storage, &subject)? == Some(true) {
-        Ok(Response {
-            messages: vec![],
-            events: vec![],
-            attributes: vec![
-                attr("action", "already raised flag"),
-                attr("subject", subject),
-            ],
-            data: None,
-        })
+        Ok(Response::new().add_attributes(vec![
+            attr("action", "already raised flag"),
+            attr("subject", subject),
+        ]))
     } else {
         FLAGS.save(deps.storage, &subject, &true)?;
-        Ok(Response {
-            messages: vec![],
-            events: vec![],
-            attributes: vec![attr("action", "raised flag"), attr("subject", subject)],
-            data: None,
-        })
+        Ok(Response::new().add_attributes(vec![
+            attr("action", "raised flag"),
+            attr("subject", subject),
+        ]))
     }
 }
 
@@ -80,9 +83,15 @@ pub fn execute_raise_flags(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    subjects: Vec<Addr>,
+    subjects: Vec<String>,
 ) -> Result<Response, ContractError> {
     check_access(deps.as_ref())?;
+
+    let subjects = subjects
+        .iter()
+        .map(|subject| deps.api.addr_validate(subject))
+        .collect::<Result<Vec<Addr>, _>>()?;
+
     let mut attributes = vec![];
     for subject in subjects {
         if FLAGS.may_load(deps.as_ref().storage, &subject)? == Some(true) {
@@ -96,21 +105,22 @@ pub fn execute_raise_flags(
                 .extend_from_slice(&[attr("action", "flag raised"), attr("subject", subject)]);
         }
     }
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes,
-        data: None,
-    })
+    Ok(Response::new().add_attributes(attributes))
 }
 
 pub fn execute_lower_flags(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    subjects: Vec<Addr>,
+    subjects: Vec<String>,
 ) -> Result<Response, ContractError> {
     validate_ownership(deps.as_ref(), &env, info)?;
+
+    let subjects = subjects
+        .iter()
+        .map(|subject| deps.api.addr_validate(subject))
+        .collect::<Result<Vec<Addr>, _>>()?;
+
     let mut attributes = vec![];
     for subject in subjects {
         if FLAGS.may_load(deps.storage, &subject)? == Some(true) {
@@ -119,44 +129,43 @@ pub fn execute_lower_flags(
                 .extend_from_slice(&[attr("action", "flag lowered"), attr("address", subject)]);
         }
     }
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes,
-        data: None,
-    })
+    Ok(Response::new().add_attributes(attributes))
 }
 
 pub fn execute_set_raising_access_controller(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    rac_address: Addr,
+    rac_address: String,
 ) -> Result<Response, ContractError> {
     validate_ownership(deps.as_ref(), &env, info)?;
+
+    let new_rac = deps.api.addr_validate(&rac_address)?;
     let prev_rac = config_read(deps.storage).load()?.raising_access_controller;
     config(deps.storage).save(&State {
-        raising_access_controller: rac_address.clone(),
+        raising_access_controller: new_rac,
     })?;
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes: vec![
-            attr("action", "raising access controller updated"),
-            attr("address", rac_address),
-            attr("previous", prev_rac),
-        ],
-        data: None,
-    })
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "raising access controller updated"),
+        attr("address", rac_address),
+        attr("previous", prev_rac),
+    ]))
 }
 
-pub fn get_flag(deps: Deps, subject: Addr) -> Result<bool, ContractError> {
+pub fn get_flag(deps: Deps, subject: String) -> Result<bool, ContractError> {
     check_access(deps)?;
+    let subject = deps.api.addr_validate(&subject)?;
     Ok(FLAGS.load(deps.storage, &subject)?)
 }
 
-pub fn get_flags(deps: Deps, subjects: Vec<Addr>) -> Result<Vec<bool>, ContractError> {
+pub fn get_flags(deps: Deps, subjects: Vec<String>) -> Result<Vec<bool>, ContractError> {
     check_access(deps)?;
+
+    let subjects = subjects
+        .iter()
+        .map(|subject| deps.api.addr_validate(subject))
+        .collect::<Result<Vec<Addr>, _>>()?;
+
     let flags = subjects
         .iter()
         .filter_map(|subject| {
@@ -218,15 +227,15 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         let info = mock_info("human", &[]);
-        let addr = info.sender.clone();
+        let sender = "human".to_string();
 
         let msg = ExecuteMsg::RaiseFlag {
-            subject: addr.clone(),
+            subject: sender.clone(),
         };
 
         let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone());
 
-        let flag = get_flag(deps.as_ref(), addr.clone()).unwrap();
+        let flag = get_flag(deps.as_ref(), sender.clone()).unwrap();
         assert_eq!(true, flag);
 
         // trying to raise the flag when it's already raised
@@ -234,7 +243,7 @@ mod tests {
         assert_eq!(
             vec![
                 attr("action", "already raised flag"),
-                attr("subject", addr.clone())
+                attr("subject", sender.clone())
             ],
             res.unwrap().attributes
         );
@@ -252,21 +261,26 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         let info = mock_info("human", &[]);
-        let addr = info.sender.clone();
+        let sender = "human".to_string();
 
-        let _res = execute_raise_flags(deps.as_mut(), mock_env(), info.clone(), vec![addr.clone()]);
+        let _res = execute_raise_flags(
+            deps.as_mut(),
+            mock_env(),
+            info.clone(),
+            vec![sender.clone()],
+        );
 
-        let flags = get_flags(deps.as_ref(), vec![addr.clone()]);
+        let flags = get_flags(deps.as_ref(), vec![sender.clone()]);
         assert_eq!(vec![true], flags.unwrap());
 
         let msg = ExecuteMsg::RaiseFlags {
-            subjects: vec![addr.clone()],
+            subjects: vec![sender.clone()],
         };
         let res = execute(deps.as_mut(), mock_env(), info, msg.clone());
         assert_eq!(
             vec![
                 attr("action", "already raised flag"),
-                attr("subject", addr.clone())
+                attr("subject", sender.clone())
             ],
             res.unwrap().attributes
         );

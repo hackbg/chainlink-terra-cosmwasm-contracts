@@ -3,10 +3,10 @@
 use cosmwasm_std::{
     attr, from_binary,
     testing::{mock_env, MockApi, MockStorage},
-    Addr, Attribute, Empty, Uint128,
+    Addr, Attribute, Binary, Empty, Uint128,
 };
 use cw20::BalanceResponse;
-use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
+use cw_multi_test::{App, BankKeeper, Contract, ContractWrapper, Executor};
 
 use crate::{
     contract::{execute, instantiate, query},
@@ -29,10 +29,11 @@ static ANSWER: Uint128 = Uint128::new(100);
 
 fn mock_app() -> App {
     let env = mock_env();
-    let api = Box::new(MockApi::default());
-    let bank = SimpleBank {};
+    let api = MockApi::default();
+    let bank = BankKeeper::new();
+    let storage = MockStorage::new();
 
-    App::new(api, env.block, bank, || Box::new(MockStorage::new()))
+    App::new(api, env.block, bank, storage)
 }
 
 pub fn contract_flux_aggregator() -> Box<dyn Contract<Empty>> {
@@ -70,6 +71,7 @@ fn default_init() -> (App, Addr, Addr, Addr) {
             &link_token::msg::InstantiateMsg {},
             &[],
             "LINK",
+            None,
         )
         .unwrap();
 
@@ -79,11 +81,12 @@ fn default_init() -> (App, Addr, Addr, Addr) {
             id,
             owner.clone(),
             &deviation_flagging_validator::msg::InstantiateMsg {
-                flags: Addr::unchecked("flags"),
+                flags: "flags".to_owned(),
                 flagging_threshold: 100000,
             },
             &[],
             "Deviation Flagging Validator",
+            None,
         )
         .unwrap();
 
@@ -104,6 +107,7 @@ fn default_init() -> (App, Addr, Addr, Addr) {
             },
             &[],
             "Flux aggregator",
+            None,
         )
         .unwrap();
 
@@ -112,19 +116,11 @@ fn default_init() -> (App, Addr, Addr, Addr) {
         .execute_contract(
             owner.clone(),
             link_addr.clone(),
-            &link_token::msg::ExecuteMsg::Transfer {
-                recipient: contract.to_string(),
+            &link_token::msg::ExecuteMsg::Send {
+                contract: contract.to_string(),
                 amount: DEPOSIT,
+                msg: Binary::from(b""),
             },
-            &[],
-        )
-        .unwrap();
-
-    router
-        .execute_contract(
-            owner.clone(),
-            contract.clone(),
-            &ExecuteMsg::UpdateAvailableFunds {},
             &[],
         )
         .unwrap();

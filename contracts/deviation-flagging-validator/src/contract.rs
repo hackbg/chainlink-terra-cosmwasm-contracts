@@ -1,7 +1,5 @@
-use cosmwasm_std::SubMsg;
 use cosmwasm_std::{
-    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
-    WasmMsg,
+    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, WasmMsg,
 };
 
 use crate::error::ContractError;
@@ -9,7 +7,9 @@ use crate::msg::*;
 use crate::state::*;
 
 use flags::msg::ExecuteMsg as FlagsMsg;
-use owned::contract::{execute_accept_ownership, get_owner, instantiate as owned_init};
+use owned::contract::{
+    execute_accept_ownership, execute_transfer_ownership, get_owner, instantiate as owned_init,
+};
 
 static THRESHOLD_MULTIPLIER: u128 = 100000;
 
@@ -19,8 +19,9 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
+    let flags = deps.api.addr_validate(&msg.flags)?;
     let state = State {
-        flags: msg.flags,
+        flags,
         flagging_threshold: msg.flagging_threshold,
     };
 
@@ -55,18 +56,13 @@ pub fn execute(
             round_id,
             answer,
         ),
-        ExecuteMsg::TransferOwnership { to } => execute_transfer_ownership(deps, env, info, to),
-        ExecuteMsg::AcceptOwnership {} => execute_owned_accept_ownership(deps, env, info),
+        ExecuteMsg::TransferOwnership { to } => {
+            execute_transfer_ownership(deps, env, info, to).map_err(ContractError::from)
+        }
+        ExecuteMsg::AcceptOwnership {} => {
+            execute_accept_ownership(deps, env, info).map_err(ContractError::from)
+        }
     }
-}
-
-fn execute_owned_accept_ownership(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> Result<Response, ContractError> {
-    let res = execute_accept_ownership(deps, env, info)?;
-    Ok(res)
 }
 
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
@@ -94,23 +90,20 @@ pub fn execute_validate(
         let raise_flag_msg = WasmMsg::Execute {
             contract_addr: String::from(flags),
             msg: to_binary(&FlagsMsg::RaiseFlag {
-                subject: info.sender,
+                subject: info.sender.to_string(),
             })?,
             funds: vec![],
         };
-        Ok(Response {
-            messages: vec![SubMsg::new(raise_flag_msg)],
-            events: vec![],
-            attributes: vec![attr("action", "validate"), attr("is valid", false)],
-            data: Some(to_binary(&false)?),
-        })
+        Ok(Response::new()
+            .add_message(raise_flag_msg)
+            .add_attribute("action", "validate")
+            .add_attribute("is_valid", false.to_string())
+            .set_data(to_binary(&false)?))
     } else {
-        Ok(Response {
-            messages: vec![],
-            events: vec![],
-            attributes: vec![attr("action", "validate"), attr("is valid", true)],
-            data: Some(to_binary(&true)?),
-        })
+        Ok(Response::new()
+            .add_attribute("action", "validate")
+            .add_attribute("is_valid", true.to_string())
+            .set_data(to_binary(&true)?))
     }
 }
 
@@ -129,16 +122,9 @@ pub fn execute_set_flags_address(
         })?;
     }
 
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes: vec![
-            attr("action", "flags address updated"),
-            attr("previous", previous),
-            attr("current", flags),
-        ],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_attribute("action", "flags_address_updated")
+        .add_attribute("previous", previous))
 }
 
 pub fn execute_set_flagging_threshold(
@@ -157,26 +143,10 @@ pub fn execute_set_flagging_threshold(
         })?;
     }
 
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes: vec![
-            attr("action", "flagging threshold updated"),
-            attr("previous", previous_ft),
-            attr("current", threshold),
-        ],
-        data: None,
-    })
-}
-
-pub fn execute_transfer_ownership(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    to: Addr,
-) -> Result<Response, ContractError> {
-    let owned_res = owned::contract::execute_transfer_ownership(deps, env, info, to)?;
-    Ok(owned_res)
+    Ok(Response::new()
+        .add_attribute("action", "flagging_threshold_updated")
+        .add_attribute("previous", previous_ft.to_string())
+        .add_attribute("current", threshold.to_string()))
 }
 
 fn is_valid(deps: Deps, previous_answer: Uint128, answer: Uint128) -> StdResult<bool> {
@@ -215,14 +185,14 @@ fn validate_ownership(deps: Deps, _env: &Env, info: MessageInfo) -> Result<(), C
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Api};
+    use cosmwasm_std::{attr, coins, Api};
 
     #[test]
     fn proper_initialization() {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            flags: deps.api.addr_validate("flags").unwrap(),
+            flags: "flags".to_string(),
             flagging_threshold: 100000,
         };
         let info = mock_info("creator", &coins(1000, "earth"));
@@ -237,7 +207,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            flags: deps.api.addr_validate("flags").unwrap(),
+            flags: "flags".to_string(),
             flagging_threshold: 100000,
         };
         let info = mock_info("creator", &coins(1000, "earth"));
@@ -259,7 +229,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            flags: deps.api.addr_validate("flags").unwrap(),
+            flags: "flags".to_string(),
             flagging_threshold: 100000,
         };
         let info = mock_info("creator", &coins(1000, "earth"));
@@ -280,7 +250,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            flags: deps.api.addr_validate("flags").unwrap(),
+            flags: "flags".to_string(),
             flagging_threshold: 80000,
         };
         let info = mock_info("creator", &coins(1000, "earth"));
@@ -312,7 +282,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            flags: deps.api.addr_validate("flags").unwrap(),
+            flags: "flags".to_string(),
             flagging_threshold: 80000,
         };
         let info = mock_info("creator", &coins(1000, "earth"));
@@ -331,7 +301,10 @@ mod tests {
         // the case if validate is true
         let res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
         assert_eq!(
-            vec![attr("action", "validate"), attr("is valid", true)],
+            vec![
+                attr("action", "validate"),
+                attr("is_valid", true.to_string())
+            ],
             res.attributes
         );
 
@@ -343,7 +316,10 @@ mod tests {
         };
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(
-            vec![attr("action", "validate"), attr("is valid", false)],
+            vec![
+                attr("action", "validate"),
+                attr("is_valid", false.to_string())
+            ],
             res.attributes
         );
     }
@@ -353,7 +329,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            flags: deps.api.addr_validate("flags").unwrap(),
+            flags: "flags".to_string(),
             flagging_threshold: 80000,
         };
         let info = mock_info("creator", &coins(1000, "earth"));

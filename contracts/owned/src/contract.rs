@@ -45,8 +45,9 @@ pub fn execute_transfer_ownership(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    to: Addr,
+    to: String,
 ) -> Result<Response, ContractError> {
+    let to = deps.api.addr_validate(&to)?;
     let sender = info.sender;
     let owner = owner_read(deps.storage).load()?.owner;
     if sender != owner {
@@ -55,12 +56,7 @@ pub fn execute_transfer_ownership(
 
     let attributes = transfer_ownership(deps, env, to)?;
 
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes,
-        data: None,
-    })
+    Ok(Response::new().add_attributes(attributes))
 }
 
 fn transfer_ownership(deps: DepsMut, _env: Env, to: Addr) -> Result<Vec<Attribute>, ContractError> {
@@ -90,12 +86,7 @@ pub fn execute_accept_ownership(
 
     let logs = accept_ownership(deps, env, info)?;
 
-    Ok(Response {
-        messages: vec![],
-        events: vec![],
-        attributes: logs,
-        data: None,
-    })
+    Ok(Response::new().add_attributes(logs))
 }
 
 fn accept_ownership(deps: DepsMut, _env: Env, info: MessageInfo) -> StdResult<Vec<Attribute>> {
@@ -155,8 +146,13 @@ mod tests {
         assert_eq!(0, res.messages.len());
         let mock_addr = deps.api.addr_validate(MOCK_CONTRACT_ADDR).unwrap();
 
-        let res =
-            execute_transfer_ownership(deps.as_mut(), mock_env(), info, mock_addr.clone()).unwrap();
+        let res = execute_transfer_ownership(
+            deps.as_mut(),
+            mock_env(),
+            info,
+            MOCK_CONTRACT_ADDR.to_owned(),
+        )
+        .unwrap();
         assert_eq!(0, res.messages.len());
 
         let res = owner_read(&deps.storage)
@@ -179,10 +175,13 @@ mod tests {
         let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let mock_addr = deps.api.addr_validate(MOCK_CONTRACT_ADDR).unwrap();
-
-        let res =
-            execute_transfer_ownership(deps.as_mut(), mock_env(), info, mock_addr.clone()).unwrap();
+        let res = execute_transfer_ownership(
+            deps.as_mut(),
+            mock_env(),
+            info,
+            MOCK_CONTRACT_ADDR.to_owned(),
+        )
+        .unwrap();
         assert_eq!(0, res.messages.len());
 
         let res = owner_read(deps.as_ref().storage)
@@ -191,14 +190,14 @@ mod tests {
             .pending_owner
             .unwrap();
 
-        assert_eq!(mock_addr, res);
+        assert_eq!(MOCK_CONTRACT_ADDR, res);
         let info = mock_info(MOCK_CONTRACT_ADDR, &coins(1000, "earth"));
         let msg = ExecuteMsg::AcceptOwnership {};
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         let res = owner_read(deps.as_ref().storage).load().unwrap().owner;
-        assert_eq!(mock_addr, String::from(res));
+        assert_eq!(MOCK_CONTRACT_ADDR, String::from(res));
         let new_pending_owner = owner_read(&deps.storage).load().unwrap().pending_owner;
         assert_eq!(true, new_pending_owner.is_none());
     }
