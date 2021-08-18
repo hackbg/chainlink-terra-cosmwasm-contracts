@@ -5,7 +5,9 @@ use cosmwasm_std::{
 use cw20::{BalanceResponse, Cw20ReceiveMsg};
 use deviation_flagging_validator::msg::ExecuteMsg as ValidatorMsg;
 use link_token::msg::{ExecuteMsg as LinkMsg, QueryMsg as LinkQuery};
-use owned::contract::{get_owner, instantiate as owned_init};
+use owned::contract::{
+    execute_accept_ownership, execute_transfer_ownership, get_owner, instantiate as owned_init,
+};
 use utils::median::calculate_median;
 
 use crate::{error::*, msg::*, state::*};
@@ -135,8 +137,12 @@ pub fn execute(
         ExecuteMsg::UpdateAvailableFunds {} => execute_update_available_funds(deps, env, info),
         ExecuteMsg::SetValidator { validator } => execute_set_validator(deps, env, info, validator),
         ExecuteMsg::Receive(receive_msg) => execute_receive(deps, env, info, receive_msg),
-        ExecuteMsg::TransferOwnership { to } => execute_transfer_ownership(deps, env, info, to),
-        ExecuteMsg::AcceptOwnership {} => execute_accept_ownership(deps, env, info),
+        ExecuteMsg::TransferOwnership { to } => {
+            execute_transfer_ownership(deps, env, info, to).map_err(ContractError::from)
+        }
+        ExecuteMsg::AcceptOwnership {} => {
+            execute_accept_ownership(deps, env, info).map_err(ContractError::from)
+        }
     }
 }
 
@@ -929,24 +935,6 @@ pub fn execute_receive(
             .add_attribute("amount", now_available)),
         None => Ok(Response::default()),
     }
-}
-
-pub fn execute_accept_ownership(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> Result<Response, ContractError> {
-    owned::contract::execute_accept_ownership(deps, env, info).map_err(ContractError::from)
-}
-
-pub fn execute_transfer_ownership(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    to: String,
-) -> Result<Response, ContractError> {
-    let to = deps.api.addr_validate(&to)?;
-    owned::contract::execute_transfer_ownership(deps, env, info, to).map_err(ContractError::from)
 }
 
 fn required_reserve(payment: Uint128, oracle_count: u8) -> Uint128 {
