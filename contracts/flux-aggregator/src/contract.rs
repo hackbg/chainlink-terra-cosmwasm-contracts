@@ -6,7 +6,9 @@ use cosmwasm_std::{
 use cw20::{BalanceResponse, Cw20ReceiveMsg};
 use deviation_flagging_validator::msg::ExecuteMsg as ValidatorMsg;
 use link_token::msg::{ExecuteMsg as LinkMsg, QueryMsg as LinkQuery};
-use owned::contract::{get_owner, instantiate as owned_init};
+use owned::contract::{
+    execute_accept_ownership, execute_transfer_ownership, get_owner, instantiate as owned_init,
+};
 use utils::median::calculate_median;
 
 use crate::{error::*, msg::*, state::*};
@@ -136,8 +138,12 @@ pub fn execute(
         ExecuteMsg::UpdateAvailableFunds {} => execute_update_available_funds(deps, env, info),
         ExecuteMsg::SetValidator { validator } => execute_set_validator(deps, env, info, validator),
         ExecuteMsg::Receive(receive_msg) => execute_receive(deps, env, info, receive_msg),
-        ExecuteMsg::TransferOwnership { to } => execute_transfer_ownership(deps, env, info, to),
-        ExecuteMsg::AcceptOwnership {} => execute_accept_ownership(deps, env, info),
+        ExecuteMsg::TransferOwnership { to } => {
+            execute_transfer_ownership(deps, env, info, to).map_err(ContractError::from)
+        }
+        ExecuteMsg::AcceptOwnership {} => {
+            execute_accept_ownership(deps, env, info).map_err(ContractError::from)
+        }
     }
 }
 
@@ -456,7 +462,7 @@ pub fn execute_change_oracles(
         ..
     } = CONFIG.load(deps.storage)?;
 
-    let _res = execute_update_future_rounds(
+    let res = execute_update_future_rounds(
         deps,
         env,
         info,
@@ -466,13 +472,16 @@ pub fn execute_change_oracles(
         restart_delay,
         timeout,
     )?;
-    // TODO uncomment if needed
-    // attributes.extend_from_slice(&res.attributes);
 
-    response = response
-        .add_attribute("action", "oracle_permissions_updated")
-        .add_attribute("added", format!("{:?}", &added))
-        .add_attribute("removed", format!("{:?}", &removed));
+    response = response.add_events(vec![
+        res.events
+            .get(0)
+            .ok_or_else(|| StdError::generic_err("No event from execute_update_available_funds"))?
+            .clone(),
+        Event::new("oracle_permissions_updated")
+            .add_attribute("added", format!("{:?}", &added))
+            .add_attribute("removed", format!("{:?}", &removed)),
+    ]);
 
     Ok(response)
 }
@@ -866,13 +875,14 @@ pub fn execute_update_future_rounds(
         })
     })?;
 
-    Ok(Response::new()
-        .add_attribute("action", "round_details_updated")
-        .add_attribute("payment_amount", payment_amount)
-        .add_attribute("min_submissions", min_submissions.to_string())
-        .add_attribute("max_submissions", max_submissions.to_string())
-        .add_attribute("restart_delay", restart_delay.to_string())
-        .add_attribute("timeout", timeout.to_string()))
+    Ok(Response::new().add_event(
+        Event::new("round_details_updated")
+            .add_attribute("payment_amount", payment_amount)
+            .add_attribute("min_submissions", min_submissions.to_string())
+            .add_attribute("max_submissions", max_submissions.to_string())
+            .add_attribute("restart_delay", restart_delay.to_string())
+            .add_attribute("timeout", timeout.to_string()),
+    ))
 }
 
 pub fn execute_set_validator(
@@ -926,24 +936,6 @@ pub fn execute_receive(
             .add_attribute("amount", now_available)),
         None => Ok(Response::default()),
     }
-}
-
-pub fn execute_accept_ownership(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> Result<Response, ContractError> {
-    owned::contract::execute_accept_ownership(deps, env, info).map_err(ContractError::from)
-}
-
-pub fn execute_transfer_ownership(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    to: String,
-) -> Result<Response, ContractError> {
-    let to = deps.api.addr_validate(&to)?;
-    owned::contract::execute_transfer_ownership(deps, env, info, to).map_err(ContractError::from)
 }
 
 fn required_reserve(payment: Uint128, oracle_count: u8) -> Uint128 {

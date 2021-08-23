@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
     /// The address of the flags contract
-    pub flags: Addr,
+    pub flags: String,
     /// The threshold that will trigger a flag to be raised
     /// Setting the value of 100,000 is equivalent to tolerating a 100% change
     /// compared to the previous price
@@ -19,7 +19,7 @@ pub enum ExecuteMsg {
     /// Can be used only by owner
     TransferOwnership {
         /// Address to transfer ownership to
-        to: Addr,
+        to: String,
     },
     /// Finish contract ownership transfer. Can be used only by pending owner
     AcceptOwnership {},

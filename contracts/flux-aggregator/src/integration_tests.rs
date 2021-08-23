@@ -82,7 +82,7 @@ fn default_init() -> (App, Addr, Addr, Addr) {
             id,
             owner.clone(),
             &deviation_flagging_validator::msg::InstantiateMsg {
-                flags: Addr::unchecked("flags"),
+                flags: "flags".to_owned(),
                 flagging_threshold: 100000,
             },
             &[],
