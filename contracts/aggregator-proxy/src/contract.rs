@@ -54,7 +54,7 @@ pub fn execute(
             execute_confirm_aggregator(deps, env, info, aggregator)
         }
         ExecuteMsg::TransferOwnership { to } => {
-            execute_transfer_ownership(deps, env, info, to).map_err(ContractError::from)
+            execute_transfer_ownership(deps, env, info, to.to_string()).map_err(ContractError::from)
         }
         ExecuteMsg::AcceptOwnership {} => {
             execute_accept_ownership(deps, env, info).map_err(ContractError::from)
@@ -317,7 +317,7 @@ mod tests {
             df_validator_id,
             Addr::unchecked(OWNER),
             &deviation_flagging_validator::msg::InstantiateMsg {
-                flags: Addr::unchecked("flags"),
+                flags: Addr::unchecked("flags").to_string(),
                 flagging_threshold: 100000,
             },
             &[],
