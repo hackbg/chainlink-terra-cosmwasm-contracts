@@ -236,6 +236,13 @@ pub fn execute_submit(
     oracle.last_reported_round = Some(round_id);
     oracle.latest_submission = Some(submission);
 
+    response = response.add_event(
+        Event::new("submission_received")
+            .add_attribute("submission", submission)
+            .add_attribute("round_id", round_id.to_string())
+            .add_attribute("oracle", info.sender.to_string()),
+    );
+
     // update round answer
     if (round_details.submissions.len() as u32) >= round_details.min_submissions {
         let mut submissions = round_details
@@ -293,12 +300,6 @@ pub fn execute_submit(
     // save or delete round details
     if (round_details.submissions.len() as u32) < round_details.max_submissions {
         DETAILS.save(deps.storage, round_id.into(), &round_details)?;
-        response = response.add_event(
-            Event::new("submission_received")
-                .add_attribute("submission", submission)
-                .add_attribute("round_id", round_id.to_string())
-                .add_attribute("oracle", info.sender.to_string()),
-        );
     } else {
         DETAILS.remove(deps.storage, round_id.into());
     }
