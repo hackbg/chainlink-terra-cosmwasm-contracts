@@ -1,7 +1,6 @@
 [package]
-name = "utils"
+name = "median"
 version = "0.1.0"
-authors = ["Nikolay Zaharov <nzaharov988@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -9,4 +8,4 @@ edition = "2018"
 [dependencies]
 schemars = "0.8.3"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
-num-traits = { version="0.2.14", default-features = false }
+num-traits = { version = "0.2.14", default-features = false }

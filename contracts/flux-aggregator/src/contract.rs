@@ -6,10 +6,10 @@ use cosmwasm_std::{
 use cw20::{BalanceResponse, Cw20ReceiveMsg};
 use deviation_flagging_validator::msg::ExecuteMsg as ValidatorMsg;
 use link_token::msg::{ExecuteMsg as LinkMsg, QueryMsg as LinkQuery};
+use median::calculate_median;
 use owned::contract::{
     execute_accept_ownership, execute_transfer_ownership, get_owner, instantiate as owned_init,
 };
-use utils::median::calculate_median;
 
 use crate::{error::*, msg::*, state::*};
 

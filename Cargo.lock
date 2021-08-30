@@ -392,11 +392,11 @@ dependencies = [
  "cw20",
  "deviation-flagging-validator",
  "link-token",
+ "median",
  "owned",
  "schemars",
  "serde",
  "thiserror",
- "utils",
 ]
 
 [[package]]
@@ -505,6 +505,15 @@ dependencies = [
  "schemars",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "median"
+version = "0.1.0"
+dependencies = [
+ "num-traits",
+ "schemars",
+ "serde",
 ]
 
 [[package]]
@@ -783,15 +792,6 @@ name = "unicode-xid"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ccb82d61f80a663efe1f787a51b16b5a51e3314d6ac365b08639f52387b33f3"
-
-[[package]]
-name = "utils"
-version = "0.1.0"
-dependencies = [
- "num-traits",
- "schemars",
- "serde",
-]
 
 [[package]]
 name = "version_check"

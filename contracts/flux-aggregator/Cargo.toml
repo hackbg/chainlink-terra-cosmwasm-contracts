@@ -24,7 +24,7 @@ cw20 = { version = "0.8.0" }
 link-token = { path = "../link-token", default-features = false }
 owned = { path = "../owned", default-features = false, features = ["library"] }
 deviation-flagging-validator = { path = "../deviation-flagging-validator", default-features = false }
-utils = { path = "../utils" }
+median = { path = "../../packages/median" }
 chainlink-aggregator = { path = "../../packages/chainlink-aggregator" }
 
 [dev-dependencies]
