@@ -16,7 +16,20 @@
       "additionalProperties": false
     },
     {
-      "description": "Returns the settings of the flux aggregator Response: [`ConfigResponse`] Get the amount of payment yet to be withdrawn by oracles. Response: [`Uint128`].",
+      "description": "Returns the settings of the flux aggregator Response: [`ConfigResponse`]",
+      "type": "object",
+      "required": [
+        "get_aggregator_config"
+      ],
+      "properties": {
+        "get_aggregator_config": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Get the amount of payment yet to be withdrawn by oracles. Response: [`Uint128`].",
       "type": "object",
       "required": [
         "get_allocated_funds"
@@ -112,7 +125,7 @@
       "additionalProperties": false
     },
     {
-      "description": "Query data for a specific round Response: [`RoundDataResponse`]. Query data for the latest round Response: [`RoundDataResponse`]. Get status of specific oracle Response: [`OracleStatus`].",
+      "description": "Get status of specific oracle Response: [`OracleStatus`].",
       "type": "object",
       "required": [
         "get_oracle_status"
@@ -187,13 +200,48 @@
           "additionalProperties": false
         },
         {
-          "description": "Returns the settings of the flux aggregator Response: [`ConfigResponse`]",
           "type": "object",
           "required": [
-            "get_aggregator_config"
+            "get_decimals"
           ],
           "properties": {
-            "get_aggregator_config": {
+            "get_decimals": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "get_description"
+          ],
+          "properties": {
+            "get_description": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "get_version"
+          ],
+          "properties": {
+            "get_version": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "get_latest_answer"
+          ],
+          "properties": {
+            "get_latest_answer": {
               "type": "object"
             }
           },

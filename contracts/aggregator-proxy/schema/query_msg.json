@@ -17,40 +17,6 @@
     {
       "type": "object",
       "required": [
-        "get_round_data"
-      ],
-      "properties": {
-        "get_round_data": {
-          "type": "object",
-          "required": [
-            "round_id"
-          ],
-          "properties": {
-            "round_id": {
-              "type": "integer",
-              "format": "uint32",
-              "minimum": 0.0
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "get_latest_round_data"
-      ],
-      "properties": {
-        "get_latest_round_data": {
-          "type": "object"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
         "get_proposed_round_data"
       ],
       "properties": {
@@ -121,23 +87,11 @@
     {
       "type": "object",
       "required": [
-        "get_decimals"
+        "aggregator_query"
       ],
       "properties": {
-        "get_decimals": {
-          "type": "object"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "get_description"
-      ],
-      "properties": {
-        "get_description": {
-          "type": "object"
+        "aggregator_query": {
+          "$ref": "#/definitions/QueryMsg"
         }
       },
       "additionalProperties": false
@@ -154,5 +108,96 @@
       },
       "additionalProperties": false
     }
-  ]
+  ],
+  "definitions": {
+    "QueryMsg": {
+      "anyOf": [
+        {
+          "description": "Query data for a specific round Response: [`RoundDataResponse`].",
+          "type": "object",
+          "required": [
+            "get_round_data"
+          ],
+          "properties": {
+            "get_round_data": {
+              "type": "object",
+              "required": [
+                "round_id"
+              ],
+              "properties": {
+                "round_id": {
+                  "description": "The round ID to retrieve the round data for",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Query data for the latest round Response: [`RoundDataResponse`].",
+          "type": "object",
+          "required": [
+            "get_latest_round_data"
+          ],
+          "properties": {
+            "get_latest_round_data": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "get_decimals"
+          ],
+          "properties": {
+            "get_decimals": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "get_description"
+          ],
+          "properties": {
+            "get_description": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "get_version"
+          ],
+          "properties": {
+            "get_version": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "get_latest_answer"
+          ],
+          "properties": {
+            "get_latest_answer": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
 }
