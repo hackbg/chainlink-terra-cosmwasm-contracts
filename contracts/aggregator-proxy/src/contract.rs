@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use chainlink_aggregator::{ConfigResponse, QueryMsg as AggregatorQuery, RoundDataResponse};
+use chainlink_aggregator::{LatestAnswerResponse, QueryMsg::*, RoundDataResponse};
 use cosmwasm_std::{
     to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult,
     Storage, Uint128,
@@ -9,6 +9,7 @@ use owned::contract::{
     execute_accept_ownership, execute_transfer_ownership, get_owner,
     instantiate as owned_instantiate,
 };
+use serde::de::DeserializeOwned;
 
 use crate::{
     error::ContractError,
@@ -112,8 +113,6 @@ pub fn execute_confirm_aggregator(
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetPhaseAggregators {} => to_binary(&get_phase_aggregators(deps, env)?),
-        QueryMsg::GetRoundData { round_id } => to_binary(&get_round_data(deps, env, round_id)?),
-        QueryMsg::GetLatestRoundData {} => to_binary(&get_latest_round_data(deps, env)?),
         QueryMsg::GetProposedRoundData { round_id } => {
             to_binary(&get_proposed_round_data(deps, env, round_id)?)
         }
@@ -123,10 +122,34 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetProposedAggregator {} => to_binary(&get_proposed_aggregator(deps, env)?),
         QueryMsg::GetAggregator {} => to_binary(&get_aggregator(deps, env)?),
         QueryMsg::GetPhaseId {} => to_binary(&get_phase_id(deps, env)?),
-        QueryMsg::GetDecimals {} => to_binary(&get_decimals(deps, env)?),
-        QueryMsg::GetDescription {} => to_binary(&get_description(deps, env)?),
         QueryMsg::GetOwner {} => to_binary(&get_owner(deps)?),
+        QueryMsg::AggregatorQuery(GetRoundData { round_id }) => {
+            to_binary(&get_round_data(deps, env, round_id)?)
+        }
+        QueryMsg::AggregatorQuery(GetLatestRoundData {}) => {
+            to_binary(&get_latest_round_data(deps, env)?)
+        }
+        QueryMsg::AggregatorQuery(GetDecimals {}) => to_binary(&get_decimals(deps, env)?),
+        QueryMsg::AggregatorQuery(GetVersion {}) => to_binary(&get_version(deps, env)?),
+        QueryMsg::AggregatorQuery(GetDescription {}) => to_binary(&get_description(deps, env)?),
+        QueryMsg::AggregatorQuery(GetLatestAnswer {}) => to_binary(&get_latest_answer(deps, env)?),
     }
+}
+
+pub fn get_decimals(deps: Deps, _env: Env) -> StdResult<u8> {
+    query_current(deps, GetDecimals {})
+}
+
+pub fn get_version(deps: Deps, _env: Env) -> StdResult<Uint128> {
+    query_current(deps, GetVersion {})
+}
+
+pub fn get_description(deps: Deps, _env: Env) -> StdResult<String> {
+    query_current(deps, GetDescription {})
+}
+
+pub fn get_latest_answer(deps: Deps, _env: Env) -> StdResult<LatestAnswerResponse> {
+    query_current(deps, GetLatestAnswer {})
 }
 
 pub fn get_phase_aggregators(deps: Deps, _env: Env) -> StdResult<PhaseAggregators> {
@@ -149,10 +172,9 @@ pub fn get_round_data(deps: Deps, _env: Env, round_id: u32) -> StdResult<RoundDa
         // TODO improve error
         .map_err(|_| StdError::generic_err("Failed parse"))?;
     let aggregator = PHASE_AGGREGATORS.load(deps.storage, phase_id.into())?;
-    let res: RoundDataResponse = deps.querier.query_wasm_smart(
-        aggregator,
-        &AggregatorQuery::GetRoundData { round_id }.wrap(),
-    )?;
+    let res: RoundDataResponse = deps
+        .querier
+        .query_wasm_smart(aggregator, &GetRoundData { round_id }.wrap())?;
     Ok(add_phase_ids(res, phase_id))
 }
 
@@ -161,10 +183,9 @@ pub fn get_latest_round_data(deps: Deps, _env: Env) -> StdResult<RoundDataRespon
         aggregator_addr,
         id,
     } = CURRENT_PHASE.load(deps.storage)?;
-    let res: RoundDataResponse = deps.querier.query_wasm_smart(
-        aggregator_addr,
-        &AggregatorQuery::GetLatestRoundData {}.wrap(),
-    )?;
+    let res: RoundDataResponse = deps
+        .querier
+        .query_wasm_smart(aggregator_addr, &GetLatestRoundData {}.wrap())?;
     Ok(add_phase_ids(res, id))
 }
 
@@ -175,13 +196,13 @@ pub fn get_proposed_round_data(
 ) -> StdResult<RoundDataResponse> {
     let proposed = get_proposed(deps.storage)?;
     deps.querier
-        .query_wasm_smart(proposed, &AggregatorQuery::GetRoundData { round_id }.wrap())
+        .query_wasm_smart(proposed, &GetRoundData { round_id }.wrap())
 }
 
 pub fn get_proposed_latest_round_data(deps: Deps, _env: Env) -> StdResult<RoundDataResponse> {
     let proposed = get_proposed(deps.storage)?;
     deps.querier
-        .query_wasm_smart(proposed, &AggregatorQuery::GetLatestRoundData {}.wrap())
+        .query_wasm_smart(proposed, &GetLatestRoundData {}.wrap())
 }
 
 pub fn get_proposed_aggregator(deps: Deps, _env: Env) -> StdResult<Addr> {
@@ -196,26 +217,6 @@ pub fn get_aggregator(deps: Deps, _env: Env) -> StdResult<Addr> {
 
 pub fn get_phase_id(deps: Deps, _env: Env) -> StdResult<u16> {
     Ok(CURRENT_PHASE.load(deps.storage)?.id)
-}
-
-pub fn get_decimals(deps: Deps, _env: Env) -> StdResult<u8> {
-    let aggregator_addr = CURRENT_PHASE.load(deps.storage)?.aggregator_addr;
-    let res: ConfigResponse = deps.querier.query_wasm_smart(
-        aggregator_addr,
-        &AggregatorQuery::GetAggregatorConfig {}.wrap(),
-    )?;
-
-    Ok(res.decimals)
-}
-
-pub fn get_description(deps: Deps, _env: Env) -> StdResult<String> {
-    let aggregator_addr = CURRENT_PHASE.load(deps.storage)?.aggregator_addr;
-    let res: ConfigResponse = deps.querier.query_wasm_smart(
-        aggregator_addr,
-        &AggregatorQuery::GetAggregatorConfig {}.wrap(),
-    )?;
-
-    Ok(res.description)
 }
 
 fn get_proposed(storage: &dyn Storage) -> StdResult<Addr> {
@@ -233,6 +234,17 @@ fn add_phase_ids(round_data: RoundDataResponse, phase_id: u16) -> RoundDataRespo
         updated_at: round_data.updated_at,
         answered_in_round: add_phase(phase_id, round_data.answered_in_round),
     }
+}
+
+fn query_current<T: DeserializeOwned>(
+    deps: Deps,
+    query: chainlink_aggregator::QueryMsg,
+) -> StdResult<T> {
+    let Phase {
+        aggregator_addr, ..
+    } = CURRENT_PHASE.load(deps.storage)?;
+    deps.querier
+        .query_wasm_smart(aggregator_addr, &query.wrap())
 }
 
 fn add_phase(phase: u16, original_id: u32) -> u32 {
@@ -524,7 +536,7 @@ mod tests {
 
         let proxy_addr = instantiate_proxy(&mut app, flux_aggregator_addr);
 
-        let query_description = QueryMsg::GetDescription {};
+        let query_description = GetDescription {}.wrap();
         let res: String = app
             .wrap()
             .query_wasm_smart(&proxy_addr, &query_description)

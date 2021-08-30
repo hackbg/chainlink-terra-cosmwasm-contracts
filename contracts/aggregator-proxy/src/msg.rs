@@ -23,15 +23,12 @@ pub enum ExecuteMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     GetPhaseAggregators {},
-    GetRoundData { round_id: u32 },
-    GetLatestRoundData {},
     GetProposedRoundData { round_id: u32 },
     GetProposedLatestRoundData {},
     GetProposedAggregator {},
     GetAggregator {},
     GetPhaseId {},
-    GetDecimals {},
-    GetDescription {},
+    AggregatorQuery(chainlink_aggregator::QueryMsg),
     // owned
     GetOwner {},
 }

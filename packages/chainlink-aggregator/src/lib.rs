@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Uint128};
+use cosmwasm_std::Uint128;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -14,9 +14,14 @@ pub enum QueryMsg {
     /// Query data for the latest round
     /// Response: [`RoundDataResponse`].
     GetLatestRoundData {},
-    /// Returns the settings of the flux aggregator
-    /// Response: [`ConfigResponse`]
-    GetAggregatorConfig {},
+
+    GetDecimals {},
+
+    GetDescription {},
+
+    GetVersion {},
+
+    GetLatestAnswer {},
 }
 
 impl QueryMsg {
@@ -39,21 +44,6 @@ impl AggregatorQuery {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct ConfigResponse {
-    pub link: Addr,
-    pub validator: Addr,
-    pub payment_amount: Uint128,
-    pub max_submission_count: u32,
-    pub min_submission_count: u32,
-    pub restart_delay: u32,
-    pub timeout: u32,
-    pub decimals: u8,
-    pub description: String,
-    pub min_submission_value: Uint128,
-    pub max_submission_value: Uint128,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct RoundDataResponse {
     pub round_id: u32,           // uint80
     pub answer: Option<Uint128>, // int256
@@ -61,3 +51,6 @@ pub struct RoundDataResponse {
     pub updated_at: Option<u64>, // uint256
     pub answered_in_round: u32,  // uint80
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct LatestAnswerResponse(pub Option<Uint128>);

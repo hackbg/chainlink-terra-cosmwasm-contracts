@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use chainlink_aggregator::QueryMsg::*;
+use chainlink_aggregator::{QueryMsg::*, RoundDataResponse};
 use cosmwasm_std::{
     attr, from_binary,
     testing::{mock_env, MockApi, MockStorage},
@@ -12,7 +12,7 @@ use cw_multi_test::{App, BankKeeper, Contract, ContractWrapper, Executor};
 use crate::{
     contract::{execute, instantiate, query},
     error::ContractError,
-    msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, RoundDataResponse},
+    msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg},
 };
 
 macro_rules! personas {
@@ -613,10 +613,7 @@ fn set_validator() {
     assert_eq!(attributes.len(), 4);
     let config: ConfigResponse = router
         .wrap()
-        .query_wasm_smart(
-            contract.clone(),
-            &QueryMsg::AggregatorQuery(GetAggregatorConfig {}),
-        )
+        .query_wasm_smart(contract.clone(), &QueryMsg::GetAggregatorConfig {})
         .unwrap();
     assert_eq!(config.validator, new_validator);
     // setting the same validator twice should not have attributes
