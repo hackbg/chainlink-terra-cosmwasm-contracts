@@ -181,6 +181,12 @@ fn validate_ownership(deps: Deps, _env: &Env, info: MessageInfo) -> Result<(), C
     Ok(())
 }
 
+/// Called when migrating a contract instance to a new code ID.
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    // Do nothing
+    Ok(Response::default())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

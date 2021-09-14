@@ -209,3 +209,7 @@ pub struct OracleRoundStateResponse {
     pub oracle_count: u8,                   // uint8
     pub payment_amount: Uint128,            // uint128
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct MigrateMsg {}

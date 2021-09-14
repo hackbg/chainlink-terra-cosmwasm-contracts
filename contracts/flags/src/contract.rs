@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    attr, entry_point, to_binary, Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Response,
+    attr, to_binary, Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Response,
 };
 use owned::contract::execute_accept_ownership;
 use owned::contract::execute_transfer_ownership;
@@ -9,7 +9,6 @@ use crate::msg::*;
 use crate::state::*;
 use owned::contract::{get_owner, instantiate as owned_init};
 
-#[entry_point]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
@@ -24,7 +23,6 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
-#[entry_point]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -47,7 +45,6 @@ pub fn execute(
     }
 }
 
-#[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<QueryResponse, ContractError> {
     match msg {
         QueryMsg::GetFlag { subject } => Ok(to_binary(&get_flag(deps, subject)?)?),
@@ -195,6 +192,12 @@ fn check_access(_deps: Deps) -> Result<(), ContractError> {
         return Err(ContractError::NoAccess {});
     }
     Ok(())
+}
+
+/// Called when migrating a contract instance to a new code ID.
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    // Do nothing
+    Ok(Response::default())
 }
 
 #[cfg(test)]

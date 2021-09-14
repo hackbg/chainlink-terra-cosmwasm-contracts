@@ -12,7 +12,7 @@ use cw20_base::{
 };
 
 use crate::{
-    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
     state::{TokenInfo, TOKEN_INFO},
 };
 
@@ -92,6 +92,12 @@ pub fn query_token_info(deps: Deps) -> StdResult<TokenInfoResponse> {
     let info = TOKEN_INFO.load(deps.storage)?;
 
     Ok(info.into())
+}
+
+/// Called when migrating a contract instance to a new code ID.
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    // Do nothing
+    Ok(Response::default())
 }
 
 #[cfg(test)]

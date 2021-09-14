@@ -71,3 +71,7 @@ pub enum QueryMsg {
 pub struct FlaggingThresholdResponse {
     pub threshold: u32,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct MigrateMsg {}

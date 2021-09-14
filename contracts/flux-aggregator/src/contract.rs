@@ -1038,6 +1038,12 @@ fn validate_ownership(deps: Deps, info: &MessageInfo) -> Result<(), ContractErro
     Ok(())
 }
 
+/// Called when migrating a contract instance to a new code ID.
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    // Do nothing
+    Ok(Response::default())
+}
+
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::{OverflowError, OverflowOperation};

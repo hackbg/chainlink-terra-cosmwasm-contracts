@@ -55,3 +55,7 @@ pub enum QueryMsg {
     /// Return type: AllowanceResponse.
     Allowance { owner: String, spender: String },
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct MigrateMsg {}
