@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Query",
+  "anyOf": [
+    {
+      "type": "object",
+      "required": [
+        "latest_round_data"
+      ],
+      "properties": {
+        "latest_round_data": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "round_data"
+      ],
+      "properties": {
+        "round_data": {
+          "type": "object",
+          "required": [
+            "round_id"
+          ],
+          "properties": {
+            "round_id": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "latest_answer"
+      ],
+      "properties": {
+        "latest_answer": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "current_aggregator"
+      ],
+      "properties": {
+        "current_aggregator": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}
