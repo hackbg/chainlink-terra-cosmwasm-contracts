@@ -1,3 +1,4 @@
+use chainlink_aggregator::{LatestAnswerResponse, QueryMsg::*, RoundDataResponse};
 use cosmwasm_std::{
     attr, to_binary, Addr, Binary, Deps, DepsMut, Env, Event, MessageInfo, OverflowError,
     OverflowOperation, Response, StdError, StdResult, Storage, Timestamp, Uint128, WasmMsg,
@@ -5,16 +6,18 @@ use cosmwasm_std::{
 use cw20::{BalanceResponse, Cw20ReceiveMsg};
 use deviation_flagging_validator::msg::ExecuteMsg as ValidatorMsg;
 use link_token::msg::{ExecuteMsg as LinkMsg, QueryMsg as LinkQuery};
+use median::calculate_median;
 use owned::contract::{
     execute_accept_ownership, execute_transfer_ownership, get_owner, instantiate as owned_init,
 };
-use utils::median::calculate_median;
 
 use crate::{error::*, msg::*, state::*};
 
 static RESERVE_ROUNDS: u128 = 2;
 static MAX_ORACLE_COUNT: u128 = 77;
 static ROUND_MAX: u32 = u32::MAX;
+
+static VERSION: Uint128 = Uint128::new(3);
 
 pub fn instantiate(
     mut deps: DepsMut,
@@ -236,6 +239,13 @@ pub fn execute_submit(
     oracle.last_reported_round = Some(round_id);
     oracle.latest_submission = Some(submission);
 
+    response = response.add_event(
+        Event::new("submission_received")
+            .add_attribute("submission", submission)
+            .add_attribute("round_id", round_id.to_string())
+            .add_attribute("oracle", info.sender.to_string()),
+    );
+
     // update round answer
     if (round_details.submissions.len() as u32) >= round_details.min_submissions {
         let mut submissions = round_details
@@ -293,12 +303,6 @@ pub fn execute_submit(
     // save or delete round details
     if (round_details.submissions.len() as u32) < round_details.max_submissions {
         DETAILS.save(deps.storage, round_id.into(), &round_details)?;
-        response = response.add_event(
-            Event::new("submission_received")
-                .add_attribute("submission", submission)
-                .add_attribute("round_id", round_id.to_string())
-                .add_attribute("oracle", info.sender.to_string()),
-        );
     } else {
         DETAILS.remove(deps.storage, round_id.into());
     }
@@ -952,11 +956,35 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetOracleCount {} => to_binary(&get_oracle_count(deps, env)?),
         QueryMsg::GetOracles {} => to_binary(&get_oracles(deps, env)?),
         QueryMsg::GetAdmin { oracle } => to_binary(&get_admin(deps, env, oracle)?),
-        QueryMsg::GetRoundData { round_id } => to_binary(&get_round_data(deps, env, round_id)?),
-        QueryMsg::GetLatestRoundData {} => to_binary(&get_latest_round_data(deps, env)?),
         QueryMsg::GetOracleStatus { oracle } => to_binary(&get_oracle_status(deps, env, oracle)?),
         QueryMsg::GetOwner {} => to_binary(&get_owner(deps)?),
+        QueryMsg::AggregatorQuery(GetRoundData { round_id }) => {
+            to_binary(&get_round_data(deps, env, round_id)?)
+        }
+        QueryMsg::AggregatorQuery(GetLatestRoundData {}) => {
+            to_binary(&get_latest_round_data(deps, env)?)
+        }
+        QueryMsg::AggregatorQuery(GetDecimals {}) => to_binary(&get_decimals(deps, env)?),
+        QueryMsg::AggregatorQuery(GetVersion {}) => to_binary(&get_version(deps, env)?),
+        QueryMsg::AggregatorQuery(GetDescription {}) => to_binary(&get_description(deps, env)?),
+        QueryMsg::AggregatorQuery(GetLatestAnswer {}) => to_binary(&get_latest_answer(deps, env)?),
     }
+}
+
+pub fn get_decimals(deps: Deps, _env: Env) -> StdResult<u8> {
+    CONFIG.load(deps.storage).map(|config| config.decimals)
+}
+
+pub fn get_version(_deps: Deps, _env: Env) -> StdResult<Uint128> {
+    Ok(VERSION)
+}
+
+pub fn get_description(deps: Deps, _env: Env) -> StdResult<String> {
+    CONFIG.load(deps.storage).map(|config| config.description)
+}
+
+pub fn get_latest_answer(deps: Deps, env: Env) -> StdResult<LatestAnswerResponse> {
+    get_latest_round_data(deps, env).map(|round| LatestAnswerResponse(round.answer))
 }
 
 pub fn get_aggregator_config(deps: Deps, _env: Env) -> StdResult<ConfigResponse> {

@@ -157,21 +157,13 @@ pub enum QueryMsg {
         /// The address of the oracle whose admin is being queried
         oracle: String,
     },
-    /// Query data for a specific round
-    /// Response: [`RoundDataResponse`].
-    GetRoundData {
-        /// The round ID to retrieve the round data for
-        round_id: u32,
-    },
-    /// Query data for the latest round
-    /// Response: [`RoundDataResponse`].
-    GetLatestRoundData {},
     /// Get status of specific oracle
     /// Response: [`OracleStatus`].
     GetOracleStatus {
         /// Oracle address to look up for
         oracle: String,
     },
+    AggregatorQuery(chainlink_aggregator::QueryMsg),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -187,15 +179,6 @@ pub struct ConfigResponse {
     pub description: String,
     pub min_submission_value: Uint128,
     pub max_submission_value: Uint128,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct RoundDataResponse {
-    pub round_id: u32,           // uint80
-    pub answer: Option<Uint128>, // int256
-    pub started_at: Option<u64>, // int256
-    pub updated_at: Option<u64>, // uint256
-    pub answered_in_round: u32,  // uint80
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

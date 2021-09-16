@@ -1,12 +1,11 @@
 [package]
-name = "utils"
+name = "chainlink-aggregator"
 version = "0.1.0"
-authors = ["Nikolay Zaharov <nzaharov988@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+cosmwasm-std = { version = "0.16.0" }
 schemars = "0.8.3"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
-num-traits = { version="0.2.14", default-features = false }

@@ -1,6 +1,7 @@
 use std::env::current_dir;
 use std::fs::create_dir_all;
 
+use chainlink_aggregator::RoundDataResponse;
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
 use flux_aggregator::msg::*;
