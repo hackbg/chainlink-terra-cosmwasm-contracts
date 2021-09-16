@@ -62,7 +62,7 @@ contract!(
             Ok(Res::Answer {
                 value: latest_answer
             })
-        } 
+        }
         CurrentAggregator () {
             let current_aggregator: Addr = deps.querier.query_wasm_smart(
                 state.proxy_contract,

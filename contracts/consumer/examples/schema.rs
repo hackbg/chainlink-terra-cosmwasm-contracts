@@ -16,5 +16,5 @@ fn main() {
     export_schema(&schema_for!(msg::Execute), &out_dir);
     export_schema(&schema_for!(msg::Query), &out_dir);
     export_schema(&schema_for!(State), &out_dir);
-    export_schema(&schema_for!(msg::Res), &out_dir) 
+    export_schema(&schema_for!(msg::Res), &out_dir)
 }
