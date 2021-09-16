@@ -1,4 +1,4 @@
-#[allow(clippy::needless_question_mark)]
+#![allow(clippy::needless_question_mark)]
 pub use fadroma::terra::*;
 
 pub use aggregator_proxy::msg::QueryMsg as ProxyQuery;
