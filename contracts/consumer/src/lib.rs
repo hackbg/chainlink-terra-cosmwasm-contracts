@@ -23,14 +23,14 @@ contract!(
         ])
     }
 
-    [Query] (deps, state, _env, msg) -> Res {
-        LatestRoundData () {
+    [Query] (deps, state, _env, msg) -> Response {
+        GetLatestRoundData () {
             let latest_round: RoundDataResponse = deps.querier.query_wasm_smart(
                 state.proxy_contract,
                 &ProxyQuery::AggregatorQuery(GetLatestRoundData{}),
             )?;
 
-            Ok(Res::RoundDataResponse {
+            Ok(Response::RoundDataResponse {
                 round_id: latest_round.round_id,
                 answer: latest_round.answer,
                 started_at: latest_round.started_at,
@@ -38,14 +38,13 @@ contract!(
                 answered_in_round: latest_round.answered_in_round
             })
         }
-
-        RoundData (round_id: u32) {
+        GetRoundData (round_id: u32) {
             let round_data: RoundDataResponse = deps.querier.query_wasm_smart(
                 state.proxy_contract,
                 &ProxyQuery::AggregatorQuery(GetRoundData{ round_id })
             )?;
 
-            Ok(Res::RoundDataResponse {
+            Ok(Response::RoundDataResponse {
                 round_id: round_data.round_id,
                 answer: round_data.answer,
                 started_at: round_data.started_at,
@@ -53,38 +52,66 @@ contract!(
                 answered_in_round: round_data.answered_in_round
             })
         }
-        LatestAnswer () {
+        GetLatestAnswer () {
             let latest_answer: LatestAnswerResponse = deps.querier.query_wasm_smart(
                 state.proxy_contract,
                 &ProxyQuery::AggregatorQuery(GetLatestAnswer{})
             )?;
 
-            Ok(Res::Answer {
-                value: latest_answer
+            Ok(Response::Answer {
+                value: latest_answer.0
             })
         }
-        CurrentAggregator () {
+        GetCurrentAggregator () {
             let current_aggregator: Addr = deps.querier.query_wasm_smart(
                 state.proxy_contract,
                 &ProxyQuery::GetAggregator{}
             )?;
 
-            Ok(Res::Aggregator {
+            Ok(Response::Aggregator {
                 address: current_aggregator
             })
         }
+        GetDecimals () {
+            let decimals: u8 = deps.querier.query_wasm_smart(
+                state.proxy_contract,
+                &ProxyQuery::AggregatorQuery(GetDecimals{})
+            )?;
+
+            Ok(Response::Decimals{value: decimals})
+        }
+        GetDescription () {
+             let description: String = deps.querier.query_wasm_smart(
+                state.proxy_contract,
+                &ProxyQuery::AggregatorQuery(GetDescription{})
+            )?;
+
+            Ok(Response::Description{value:  description})
+        }
+        GetVersion () {
+            let version: Uint128 = deps.querier.query_wasm_smart(
+                state.proxy_contract,
+                &ProxyQuery::AggregatorQuery(GetVersion{})
+            )?;
+
+            Ok(Response::Version{value: version})
+        }
     }
-    [Res] {
+
+    [Response] {
         RoundDataResponse {
-            round_id: u32,           // uint80
-            answer: Option<Uint128>, // int256
-            started_at: Option<u64>, // int256
-            updated_at: Option<u64>, // uint256
+            round_id: u32,
+            answer: Option<Uint128>,
+            started_at: Option<u64>,
+            updated_at: Option<u64>,
             answered_in_round: u32
         }
 
-        Answer {value: LatestAnswerResponse}
+        Answer {value: Option<Uint128>}
         Aggregator {address: Addr}
+        Decimals { value: u8 }
+        Description { value: String }
+        Version {value: Uint128}
     }
 
     [Execute] (deps, _env, _info, state, msg) -> Result {
