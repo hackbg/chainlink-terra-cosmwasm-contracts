@@ -2,8 +2,8 @@ use std::convert::TryInto;
 
 use chainlink_aggregator::{LatestAnswerResponse, QueryMsg::*, RoundDataResponse};
 use cosmwasm_std::{
-    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult,
-    Storage, Uint128,
+    to_binary, Addr, Binary, Deps, DepsMut, Env, Event, MessageInfo, Order, Response, StdError,
+    StdResult, Storage, Uint128,
 };
 use owned::contract::{
     execute_accept_ownership, execute_transfer_ownership, get_owner,
@@ -85,6 +85,8 @@ pub fn execute_confirm_aggregator(
 ) -> Result<Response, ContractError> {
     validate_ownership(deps.as_ref(), &info)?;
 
+    let mut response = Response::new();
+
     let aggregator_addr = deps.api.addr_validate(&aggregator)?;
 
     let proposed = PROPOSED_AGGREGATOR
@@ -103,11 +105,15 @@ pub fn execute_confirm_aggregator(
         deps.storage,
         &Phase {
             id: new_id,
-            aggregator_addr,
+            aggregator_addr: aggregator_addr.clone(),
         },
     )?;
 
-    Ok(Response::default())
+    response = response.add_event(
+        Event::new("confirm_aggregator").add_attribute("aggregator", aggregator_addr.to_string()),
+    );
+
+    Ok(response)
 }
 
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
