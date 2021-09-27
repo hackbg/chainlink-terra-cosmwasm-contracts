@@ -13,7 +13,7 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     error::ContractError,
-    msg::{ExecuteMsg, InstantiateMsg, PhaseAggregators, QueryMsg},
+    msg::{ExecuteMsg, InstantiateMsg, PhaseAggregators, QueryMsg, MigrateMsg},
     state::{Phase, CURRENT_PHASE, PHASE_AGGREGATORS, PROPOSED_AGGREGATOR},
 };
 
@@ -266,6 +266,12 @@ fn validate_ownership(deps: Deps, info: &MessageInfo) -> Result<(), ContractErro
         return Err(ContractError::NotOwner {});
     }
     Ok(())
+}
+
+// Called when migrating a contract instance to a new code ID
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    // Do nothing
+    Ok(Response::default())
 }
 
 #[cfg(test)]
