@@ -13,7 +13,7 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     error::ContractError,
-    msg::{ExecuteMsg, InstantiateMsg, PhaseAggregators, QueryMsg, MigrateMsg},
+    msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, PhaseAggregators, QueryMsg},
     state::{Phase, CURRENT_PHASE, PHASE_AGGREGATORS, PROPOSED_AGGREGATOR},
 };
 
