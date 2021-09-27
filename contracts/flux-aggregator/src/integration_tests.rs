@@ -1,5 +1,6 @@
 #![cfg(test)]
 
+use chainlink_aggregator::{QueryMsg::*, RoundDataResponse};
 use cosmwasm_std::{
     attr, from_binary,
     testing::{mock_env, MockApi, MockStorage},
@@ -11,7 +12,7 @@ use cw_multi_test::{App, BankKeeper, Contract, ContractWrapper, Executor};
 use crate::{
     contract::{execute, instantiate, query},
     error::ContractError,
-    msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, RoundDataResponse},
+    msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg},
 };
 
 macro_rules! personas {
@@ -263,7 +264,10 @@ fn submit_unfinished_round() {
 
     let round: RoundDataResponse = router
         .wrap()
-        .query_wasm_smart(contract.clone(), &QueryMsg::GetLatestRoundData {})
+        .query_wasm_smart(
+            contract.clone(),
+            &QueryMsg::AggregatorQuery(GetLatestRoundData {}),
+        )
         .unwrap();
     assert!(round.answer.is_none());
 
@@ -280,7 +284,10 @@ fn submit_unfinished_round() {
 
     let round: RoundDataResponse = router
         .wrap()
-        .query_wasm_smart(contract.clone(), &QueryMsg::GetLatestRoundData {})
+        .query_wasm_smart(
+            contract.clone(),
+            &QueryMsg::AggregatorQuery(GetLatestRoundData {}),
+        )
         .unwrap();
     // answer should not be updated
     assert!(round.answer.is_none());
@@ -305,7 +312,10 @@ fn submit_complete_round() {
 
     let round: RoundDataResponse = router
         .wrap()
-        .query_wasm_smart(contract.clone(), &QueryMsg::GetLatestRoundData {})
+        .query_wasm_smart(
+            contract.clone(),
+            &QueryMsg::AggregatorQuery(GetLatestRoundData {}),
+        )
         .unwrap();
     assert!(round.answer.is_none());
 
@@ -334,7 +344,10 @@ fn submit_complete_round() {
 
     let round: RoundDataResponse = router
         .wrap()
-        .query_wasm_smart(contract.clone(), &QueryMsg::GetLatestRoundData {})
+        .query_wasm_smart(
+            contract.clone(),
+            &QueryMsg::AggregatorQuery(GetLatestRoundData {}),
+        )
         .unwrap();
     assert!(round.updated_at.is_some());
     assert_eq!(round.answer, Some(Uint128::new(150))); // (100 + 200) / 2
@@ -890,7 +903,10 @@ fn request_new_round_round_in_progress() {
         .unwrap();
     let res: RoundDataResponse = router
         .wrap()
-        .query_wasm_smart(contract.clone(), &QueryMsg::GetLatestRoundData {})
+        .query_wasm_smart(
+            contract.clone(),
+            &QueryMsg::AggregatorQuery(GetLatestRoundData {}),
+        )
         .unwrap();
     assert!(res.answer.is_none());
 

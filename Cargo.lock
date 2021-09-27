@@ -3,6 +3,25 @@
 version = 3
 
 [[package]]
+name = "aggregator-proxy"
+version = "0.1.0"
+dependencies = [
+ "chainlink-aggregator",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-multi-test",
+ "cw-storage-plus",
+ "deviation-flagging-validator",
+ "flux-aggregator",
+ "link-token",
+ "owned",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -46,6 +65,15 @@ name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
+name = "chainlink-aggregator"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-std",
+ "schemars",
+ "serde",
+]
 
 [[package]]
 name = "const-oid"
@@ -281,9 +309,9 @@ checksum = "ee2626afccd7561a06cf1367e2950c4718ea04565e20fb5029b6c7d8ad09abcf"
 
 [[package]]
 name = "ecdsa"
-version = "0.12.3"
+version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "713c32426287891008edb98f8b5c6abb2130aa043c93a818728fcda78606f274"
+checksum = "43ee23aa5b4f68c7a092b5c3beb25f50c406adc75e2363634f242f28ab255372"
 dependencies = [
  "der",
  "elliptic-curve",
@@ -329,9 +357,9 @@ dependencies = [
 
 [[package]]
 name = "ff"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63eec06c61e487eecf0f7e6e6372e596a81922c28d33e645d6983ca6493a1af0"
+checksum = "d0f40b2dcd8bc322217a5f6559ae5f9e9d1de202a2ecee2e9eafcbece7562a4f"
 dependencies = [
  "rand_core 0.6.3",
  "subtle",
@@ -355,6 +383,7 @@ dependencies = [
 name = "flux-aggregator"
 version = "0.1.0"
 dependencies = [
+ "chainlink-aggregator",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -363,11 +392,11 @@ dependencies = [
  "cw20",
  "deviation-flagging-validator",
  "link-token",
+ "median",
  "owned",
  "schemars",
  "serde",
  "thiserror",
- "utils",
 ]
 
 [[package]]
@@ -476,6 +505,15 @@ dependencies = [
  "schemars",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "median"
+version = "0.1.0"
+dependencies = [
+ "num-traits",
+ "schemars",
+ "serde",
 ]
 
 [[package]]
@@ -754,15 +792,6 @@ name = "unicode-xid"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ccb82d61f80a663efe1f787a51b16b5a51e3314d6ac365b08639f52387b33f3"
-
-[[package]]
-name = "utils"
-version = "0.1.0"
-dependencies = [
- "num-traits",
- "schemars",
- "serde",
-]
 
 [[package]]
 name = "version_check"
