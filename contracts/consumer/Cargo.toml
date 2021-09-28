@@ -23,7 +23,7 @@ schemars = "0.8.3"
 serde = { version = "1.0.127", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.26" }
 fadroma   = { git = "https://github.com/hackbg/fadroma", branch = "feature/terra-support", features=["terra-contract"]}
-aggregator-proxy = { path = "../aggregator-proxy", default-features = false }
+aggregator-proxy = { path = "../aggregator-proxy", default-features = false, features=["library"]}
 chainlink-aggregator = { path = "../../packages/chainlink-aggregator" }
 
 [dev-dependencies]
