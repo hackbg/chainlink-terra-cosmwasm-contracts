@@ -1,4 +1,4 @@
-# Boilerplate - Chainlink Consume Oracle Query Contract
+# Boilerplate - Chainlink Consumer Oracle Query Contract
 
 ## Using your project
 
