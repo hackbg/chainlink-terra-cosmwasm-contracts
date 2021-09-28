@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Query",
+  "anyOf": [
+    {
+      "type": "object",
+      "required": [
+        "get_latest_round_data"
+      ],
+      "properties": {
+        "get_latest_round_data": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_round_data"
+      ],
+      "properties": {
+        "get_round_data": {
+          "type": "object",
+          "required": [
+            "round_id"
+          ],
+          "properties": {
+            "round_id": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_latest_answer"
+      ],
+      "properties": {
+        "get_latest_answer": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_current_aggregator"
+      ],
+      "properties": {
+        "get_current_aggregator": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_decimals"
+      ],
+      "properties": {
+        "get_decimals": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_description"
+      ],
+      "properties": {
+        "get_description": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_version"
+      ],
+      "properties": {
+        "get_version": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}
