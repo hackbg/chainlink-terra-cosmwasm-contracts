@@ -24,7 +24,8 @@ thiserror = { version = "1.0.24" }
 owned = { path = "../owned", default-features = false, features = ["library"] }
 chainlink-aggregator = { path = "../../packages/chainlink-aggregator" }
 flux-aggregator = { path="../flux-aggregator", default-features = false}
-link-token = { path = "../link-token", default-features = false }
+cw20-base = {  version = "0.8.0", features = ["library"] }
+cw20 = { version = "0.8.0" }
 deviation-flagging-validator = { path = "../deviation-flagging-validator", default-features = false }
 
 [dev-dependencies]
