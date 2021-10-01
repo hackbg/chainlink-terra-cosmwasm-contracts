@@ -12,9 +12,10 @@ dependencies = [
  "cosmwasm-storage",
  "cw-multi-test",
  "cw-storage-plus",
+ "cw20",
+ "cw20-base",
  "deviation-flagging-validator",
  "flux-aggregator",
- "link-token",
  "owned",
  "schemars",
  "serde",
@@ -223,9 +224,9 @@ dependencies = [
 
 [[package]]
 name = "cw-storage-plus"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ef70f7912bed72ff56a4f704aee279b6ef4cd0a5f3aa2732ad371e3f6d3ea71"
+checksum = "c1e867b9972b83b32e00e878dfbff48299ba26618dabeb19b9c56fae176dc225"
 dependencies = [
  "cosmwasm-std",
  "schemars",
@@ -234,9 +235,9 @@ dependencies = [
 
 [[package]]
 name = "cw0"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "debc623e83cca463fc5f195bb6f23803a7e5e281b330b759381dcc7ef76d4393"
+checksum = "c497f885a40918a02df7d938c81809965fa05cfc21b3dc591e9950237b5de0a9"
 dependencies = [
  "cosmwasm-std",
  "schemars",
@@ -246,9 +247,9 @@ dependencies = [
 
 [[package]]
 name = "cw2"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51698a50df8be3d31d7261082f052685d04fe6289df89792fd4efa41daee8b90"
+checksum = "4d48454f96494aa1018556cd457977375cc8c57ef3e5c767cfa2ea5ec24b0258"
 dependencies = [
  "cosmwasm-std",
  "cw-storage-plus",
@@ -258,9 +259,9 @@ dependencies = [
 
 [[package]]
 name = "cw20"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f24779556263d95d5a7ebf8a0b0cd615df0b34bff69c23f409e5f17b5fb529ef"
+checksum = "a11a2adbd52258f5b4ed5323f62bc6e559f2cefbe52ef0e58290016fde5bb083"
 dependencies = [
  "cosmwasm-std",
  "cw0",
@@ -270,9 +271,9 @@ dependencies = [
 
 [[package]]
 name = "cw20-base"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc6cac998c7ac2b907fe2ccf1b5b966f5ea823b4aa6c2985770223547b7b77ec"
+checksum = "fe3791e0f6b4a0a82b86541d48dcc67c2d607da8e5691a91b40b2c06ddf09c52"
 dependencies = [
  "cosmwasm-std",
  "cw-storage-plus",
@@ -419,8 +420,8 @@ dependencies = [
  "cw-multi-test",
  "cw-storage-plus",
  "cw20",
+ "cw20-base",
  "deviation-flagging-validator",
- "link-token",
  "median",
  "owned",
  "schemars",

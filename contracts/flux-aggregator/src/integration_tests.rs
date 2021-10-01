@@ -6,7 +6,7 @@ use cosmwasm_std::{
     testing::{mock_env, MockApi, MockStorage},
     Addr, Attribute, Binary, Empty, Uint128,
 };
-use cw20::BalanceResponse;
+use cw20::{BalanceResponse, Cw20Coin};
 use cw_multi_test::{App, BankKeeper, Contract, ContractWrapper, Executor};
 
 use crate::{
@@ -44,9 +44,9 @@ pub fn contract_flux_aggregator() -> Box<dyn Contract<Empty>> {
 
 pub fn contract_link_token() -> Box<dyn Contract<Empty>> {
     let contract = ContractWrapper::new(
-        link_token::contract::execute,
-        link_token::contract::instantiate,
-        link_token::contract::query,
+        cw20_base::contract::execute,
+        cw20_base::contract::instantiate,
+        cw20_base::contract::query,
     );
     Box::new(contract)
 }
@@ -64,12 +64,24 @@ fn default_init() -> (App, Addr, Addr, Addr) {
     let mut router = mock_app();
     let owner = Addr::unchecked("owner");
 
+    let main_balance = Cw20Coin {
+        address: owner.clone().into(),
+        amount: Uint128::from(1_000_000_000 as u128),
+    };
+
     let id = router.store_code(contract_link_token());
     let link_addr = router
         .instantiate_contract(
             id,
             owner.clone(),
-            &link_token::msg::InstantiateMsg {},
+            &cw20_base::msg::InstantiateMsg {
+                name: String::from("Chainlink"),
+                symbol: String::from("LINK"),
+                decimals: 18,
+                initial_balances: vec![main_balance],
+                mint: None,
+                marketing: None,
+            },
             &[],
             "LINK",
             None,
@@ -117,7 +129,7 @@ fn default_init() -> (App, Addr, Addr, Addr) {
         .execute_contract(
             owner.clone(),
             link_addr.clone(),
-            &link_token::msg::ExecuteMsg::Send {
+            &cw20_base::msg::ExecuteMsg::Send {
                 contract: contract.to_string(),
                 amount: DEPOSIT,
                 msg: Binary::from(b""),
@@ -386,7 +398,7 @@ fn submit_twice() {
 
 #[test]
 fn withdraw_funds_success() {
-    use link_token::msg::QueryMsg::*;
+    use cw20_base::msg::QueryMsg::*;
 
     let (mut router, owner, link_addr, contract) = default_init();
 

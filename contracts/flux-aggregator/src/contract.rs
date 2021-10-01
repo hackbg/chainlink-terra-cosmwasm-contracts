@@ -4,8 +4,8 @@ use cosmwasm_std::{
     OverflowOperation, Response, StdError, StdResult, Storage, Timestamp, Uint128, WasmMsg,
 };
 use cw20::{BalanceResponse, Cw20ReceiveMsg};
+use cw20_base::msg::{ExecuteMsg as LinkMsg, QueryMsg as LinkQuery};
 use deviation_flagging_validator::msg::ExecuteMsg as ValidatorMsg;
-use link_token::msg::{ExecuteMsg as LinkMsg, QueryMsg as LinkQuery};
 use median::calculate_median;
 use owned::contract::{
     execute_accept_ownership, execute_transfer_ownership, get_owner, instantiate as owned_init,

@@ -281,6 +281,7 @@ mod tests {
         testing::{mock_env, MockApi, MockStorage},
         Addr, Empty,
     };
+    use cw20::Cw20Coin;
     use cw_multi_test::{App, BankKeeper, Contract, ContractWrapper, Executor};
 
     const OWNER: &str = "admin0001";
@@ -307,9 +308,9 @@ mod tests {
 
     pub fn contract_link_token() -> Box<dyn Contract<Empty>> {
         let contract = ContractWrapper::new(
-            link_token::contract::execute,
-            link_token::contract::instantiate,
-            link_token::contract::query,
+            cw20_base::contract::execute,
+            cw20_base::contract::instantiate,
+            cw20_base::contract::query,
         );
         Box::new(contract)
     }
@@ -324,10 +325,21 @@ mod tests {
 
     pub fn instantiate_link(app: &mut App) -> Addr {
         let link_id = app.store_code(contract_link_token());
+        let main_balance = Cw20Coin {
+            address: Addr::unchecked("owner").into(),
+            amount: Uint128::from(1_000_000_000 as u128),
+        };
         app.instantiate_contract(
             link_id,
             Addr::unchecked(OWNER),
-            &link_token::msg::InstantiateMsg {},
+            &cw20_base::msg::InstantiateMsg {
+                name: String::from("Chainlink"),
+                symbol: String::from("LINK"),
+                decimals: 18,
+                initial_balances: vec![main_balance],
+                mint: None,
+                marketing: None,
+            },
             &[],
             "LINK",
             None,

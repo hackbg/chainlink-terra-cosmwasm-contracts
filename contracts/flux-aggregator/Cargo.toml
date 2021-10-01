@@ -21,7 +21,7 @@ schemars = "0.8.3"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.24" }
 cw20 = { version = "0.8.0" }
-link-token = { path = "../link-token", default-features = false }
+cw20-base = {  version = "0.8.0", features = ["library"] }
 owned = { path = "../owned", default-features = false, features = ["library"] }
 deviation-flagging-validator = { path = "../deviation-flagging-validator", default-features = false }
 median = { path = "../../packages/median" }
